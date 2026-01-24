@@ -1,16 +1,16 @@
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import { env } from '@config/env';
 import { schema, initQueries, cleanupQueries } from './schema';
 import { logger } from '@middleware/logger';
 import fs from 'fs';
 import path from 'path';
 
-let db: Database.Database | null = null;
+let db: Database | null = null;
 
 /**
  * Inicializa conexão com banco de dados
  */
-export function initializeDatabase(): Database.Database {
+export function initializeDatabase(): Database {
   try {
     // Cria diretório se não existir
     const dbDir = path.dirname(env.DATABASE_URL);
@@ -19,7 +19,7 @@ export function initializeDatabase(): Database.Database {
     }
 
     // Abre conexão
-    db = new Database(env.DATABASE_URL);
+    db = new Database(env.DATABASE_URL, { create: true });
     
     logger.info('Conectado ao banco de dados', {
       path: env.DATABASE_URL,
@@ -27,11 +27,11 @@ export function initializeDatabase(): Database.Database {
 
     // Executa queries de inicialização
     for (const query of initQueries) {
-      db.exec(query);
+      db.run(query);
     }
 
     // Cria schema
-    db.exec(schema);
+    db.run(schema);
 
     logger.info('Schema do banco de dados criado/verificado');
 
@@ -48,7 +48,7 @@ export function initializeDatabase(): Database.Database {
 /**
  * Obtém instância do banco de dados
  */
-export function getDatabase(): Database.Database {
+export function getDatabase(): Database {
   if (!db) {
     throw new Error('Database not initialized. Call initializeDatabase() first.');
   }
@@ -73,10 +73,10 @@ export function closeDatabase(): void {
 /**
  * Executa limpeza de dados antigos
  */
-function performCleanup(database: Database.Database): void {
+function performCleanup(database: Database): void {
   try {
     for (const query of cleanupQueries) {
-      const stmt = database.prepare(query);
+      const stmt = database.query(query);
       const result = stmt.run();
       if (result.changes > 0) {
         logger.info(`Limpeza executada: ${result.changes} registros removidos`);
@@ -91,7 +91,7 @@ function performCleanup(database: Database.Database): void {
  * Executa transação
  */
 export function transaction<T>(
-  fn: (db: Database.Database) => T
+  fn: (db: Database) => T
 ): T {
   const database = getDatabase();
   const transaction = database.transaction(fn);
@@ -104,10 +104,18 @@ export function transaction<T>(
 export function execute(
   query: string,
   params: Record<string, any> = {}
-): Database.RunResult {
+): any {
   const database = getDatabase();
-  const stmt = database.prepare(query);
-  return stmt.run(params);
+  
+  // Bun SQLite usa $param em vez de :param
+  // Converter parâmetros para formato correto
+  const convertedParams: Record<string, any> = {};
+  for (const [key, value] of Object.entries(params)) {
+    convertedParams[`$${key}`] = value;
+  }
+  
+  const stmt = database.query(query);
+  return stmt.run(convertedParams);
 }
 
 /**
@@ -118,8 +126,15 @@ export function queryOne<T>(
   params: Record<string, any> = {}
 ): T | undefined {
   const database = getDatabase();
-  const stmt = database.prepare(query);
-  return stmt.get(params) as T | undefined;
+  
+  // Converter parâmetros para formato $param
+  const convertedParams: Record<string, any> = {};
+  for (const [key, value] of Object.entries(params)) {
+    convertedParams[`$${key}`] = value;
+  }
+  
+  const stmt = database.query<T, Record<string, any>>(query);
+  return stmt.get(convertedParams);
 }
 
 /**
@@ -130,8 +145,15 @@ export function queryAll<T>(
   params: Record<string, any> = {}
 ): T[] {
   const database = getDatabase();
-  const stmt = database.prepare(query);
-  return stmt.all(params) as T[];
+  
+  // Converter parâmetros para formato $param
+  const convertedParams: Record<string, any> = {};
+  for (const [key, value] of Object.entries(params)) {
+    convertedParams[`$${key}`] = value;
+  }
+  
+  const stmt = database.query(query);
+  return stmt.all(convertedParams) as T[];
 }
 
 /**
@@ -157,10 +179,20 @@ export function count(
 export function insert(
   table: string,
   data: Record<string, any>
-): Database.RunResult {
+): any {
   const keys = Object.keys(data);
-  const placeholders = keys.map((key) => `:${key}`).join(', ');
+  const placeholders = keys.map((key) => `$${key}`).join(', ');
   const query = `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`;
+  
+  // Debug: log da query e dados
+  logger.info('INSERT Query Debug', {
+    table,
+    query,
+    keys,
+    placeholders,
+    data
+  });
+  
   return execute(query, data);
 }
 
@@ -171,7 +203,7 @@ export function update(
   table: string,
   data: Record<string, any>,
   where: Record<string, any>
-): Database.RunResult {
+): any {
   const sets = Object.keys(data)
     .map((key) => `${key} = :${key}`)
     .join(', ');
@@ -197,7 +229,7 @@ export function update(
 export function deleteRecord(
   table: string,
   where: Record<string, any>
-): Database.RunResult {
+): any {
   const conditions = Object.keys(where)
     .map((key) => `${key} = :${key}`)
     .join(' AND ');
@@ -266,10 +298,8 @@ export function paginate<T>(
  */
 export function exportDatabase(outputPath: string): void {
   try {
-    const database = getDatabase();
-    const backup = database.backup(outputPath);
-    backup.step(-1);
-    backup.finish();
+    // Copia o arquivo do banco de dados
+    fs.copyFileSync(env.DATABASE_URL, outputPath);
     logger.info('Banco de dados exportado', { path: outputPath });
   } catch (error) {
     logger.error('Erro ao exportar banco de dados', error as Error);
@@ -283,9 +313,7 @@ export function exportDatabase(outputPath: string): void {
 export function restoreDatabase(backupPath: string): void {
   try {
     closeDatabase();
-    const backup = new Database(backupPath);
-    backup.backup(env.DATABASE_URL);
-    backup.close();
+    fs.copyFileSync(backupPath, env.DATABASE_URL);
     initializeDatabase();
     logger.info('Banco de dados restaurado', { path: backupPath });
   } catch (error) {

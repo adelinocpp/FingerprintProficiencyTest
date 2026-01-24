@@ -1,7 +1,7 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import { env } from '@config/env';
 import { logger } from '@middleware/logger';
-import { EmailPayload } from '@types/index';
+import { EmailPayload } from '../types/index';
 
 let transporter: Transporter | null = null;
 
@@ -10,16 +10,32 @@ let transporter: Transporter | null = null;
  */
 export function initializeEmailService(): Transporter {
   try {
-    transporter = nodemailer.createTransport({
-      service: env.EMAIL_SERVICE,
-      auth: {
-        user: env.EMAIL_USER,
-        pass: env.EMAIL_PASSWORD,
-      },
-    });
+    // Se SMTP_HOST estiver configurado, usa configuração customizada (Yahoo, etc)
+    const transportConfig = env.SMTP_HOST
+      ? {
+          host: env.SMTP_HOST,
+          port: env.SMTP_PORT,
+          secure: env.SMTP_SECURE, // true para porta 465, false para outras
+          auth: {
+            user: env.EMAIL_USER,
+            pass: env.EMAIL_PASSWORD,
+          },
+        }
+      : {
+          service: env.EMAIL_SERVICE,
+          auth: {
+            user: env.EMAIL_USER,
+            pass: env.EMAIL_PASSWORD,
+          },
+        };
+
+    transporter = nodemailer.createTransport(transportConfig);
 
     logger.info('Serviço de email inicializado', {
-      service: env.EMAIL_SERVICE,
+      service: env.SMTP_HOST || env.EMAIL_SERVICE,
+      host: env.SMTP_HOST || 'default',
+      port: env.SMTP_PORT,
+      secure: env.SMTP_SECURE,
       user: env.EMAIL_USER,
     });
 
@@ -48,7 +64,7 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
     const transport = getEmailTransporter();
 
     await transport.sendMail({
-      from: env.EMAIL_FROM,
+      from: `"${env.EMAIL_FROM_NAME}" <${env.EMAIL_FROM_EMAIL}>`,
       to: payload.to,
       subject: payload.subject,
       html: payload.html,

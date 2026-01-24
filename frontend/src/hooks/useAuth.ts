@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Participant, LoginRequest, RegisterRequest } from '@types/index';
-import { authAPI, saveToken, getToken, removeToken, decodeToken } from '@services/api';
+import { Participant, LoginRequest, RegisterRequest } from '../types/index';
+import { authAPI, saveToken, getToken, removeToken, decodeToken } from '../services/api';
 
 export interface UseAuthReturn {
   participant: Participant | null;
@@ -8,8 +8,8 @@ export interface UseAuthReturn {
   isLoading: boolean;
   isAuthenticated: boolean;
   error: string | null;
-  register: (data: RegisterRequest) => Promise<boolean>;
-  login: (data: LoginRequest) => Promise<boolean>;
+  register: (data: RegisterRequest) => Promise<any>;
+  login: (data: LoginRequest) => Promise<any>;
   logout: () => void;
   clearError: () => void;
 }
@@ -41,7 +41,7 @@ export function useAuth(): UseAuthReturn {
   }, []);
 
   const register = useCallback(
-    async (data: RegisterRequest): Promise<boolean> => {
+    async (data: RegisterRequest): Promise<any> => {
       setIsLoading(true);
       setError(null);
 
@@ -50,14 +50,14 @@ export function useAuth(): UseAuthReturn {
 
         if (!response.success) {
           setError(response.message || 'Erro ao registrar');
-          return false;
+          return response;
         }
 
-        return true;
+        return response;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Erro desconhecido';
         setError(message);
-        return false;
+        return { success: false, error: message };
       } finally {
         setIsLoading(false);
       }
@@ -66,7 +66,7 @@ export function useAuth(): UseAuthReturn {
   );
 
   const login = useCallback(
-    async (data: LoginRequest): Promise<boolean> => {
+    async (data: LoginRequest): Promise<any> => {
       setIsLoading(true);
       setError(null);
 
@@ -75,20 +75,20 @@ export function useAuth(): UseAuthReturn {
 
         if (!response.success || !response.data) {
           setError(response.message || 'Erro ao fazer login');
-          return false;
+          return response;
         }
 
-        const { token: newToken, participant: newParticipant } = response.data;
+        const { token: newToken, participant: newParticipant } = response.data as any;
 
         saveToken(newToken);
         setToken(newToken);
         setParticipant(newParticipant);
 
-        return true;
+        return response;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Erro desconhecido';
         setError(message);
-        return false;
+        return { success: false, error: message };
       } finally {
         setIsLoading(false);
       }

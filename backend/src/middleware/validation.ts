@@ -2,6 +2,29 @@ import { z } from 'zod';
 import { ValidationError } from './errorHandler';
 
 /**
+ * Valida dados com schema Zod
+ */
+export function validateWithZod<T>(schema: z.ZodSchema<T>, data: any): { success: boolean; data?: T; errors?: Record<string, string[]> } {
+  try {
+    const result = schema.parse(data);
+    return { success: true, data: result };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const errors: Record<string, string[]> = {};
+      error.errors.forEach((err) => {
+        const path = err.path.join('.');
+        if (!errors[path]) {
+          errors[path] = [];
+        }
+        errors[path].push(err.message);
+      });
+      return { success: false, errors };
+    }
+    throw error;
+  }
+}
+
+/**
  * Valida body da requisição
  */
 export function validateBody<T>(schema: z.ZodSchema<T>) {

@@ -9,6 +9,7 @@ pnpm-debug.log*
 .env
 .env.local
 .env.*.local
+*/*.env
 
 # Build outputs
 dist/
@@ -70,3 +71,8 @@ dist-ssr/
 *.md
 !frontend/README.md
 !backend/README.md
+
+*.md
+!README.md
+frontend_ref
+*.txt

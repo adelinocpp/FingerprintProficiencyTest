@@ -3,9 +3,10 @@ import { sendEmail, getWelcomeEmailTemplate } from '@services/emailService';
 import { sanitizeString, isValidEmail, isValidName, generateToken, generateSHA256 } from '@utils/security';
 import { generateUUID, formatDate } from '@utils/helpers';
 import { insert, queryOne, update, queryAll } from '@database/db';
-import { validateWithZod, RegisterSchema, LoginSchema } from '@middleware/validation';
+import { validateWithZod } from '@middleware/validation';
+import { RegisterSchema, LoginSchema } from '@utils/validators';
 import { ValidationError, AuthenticationError, ConflictError, NotFoundError, successResponse, errorResponse } from '@middleware/errorHandler';
-import { Participant, LoginResponse, Sample } from '@types/index';
+import { Participant, LoginResponse, Sample } from '../types/index';
 import { env } from '@config/env';
 import { logger } from '@middleware/logger';
 
@@ -21,6 +22,15 @@ export async function registerParticipant(body: any): Promise<any> {
     }
 
     const { voluntary_email, voluntary_name, terms_accepted } = validation.data;
+
+    // Debug: verificar dados recebidos
+    logger.info('Dados de registro recebidos', {
+      voluntary_email,
+      voluntary_name,
+      terms_accepted,
+      emailType: typeof voluntary_email,
+      emailLength: voluntary_email?.length
+    });
 
     // Verifica se email já existe
     const existingParticipant = queryOne<Participant>(
@@ -38,17 +48,27 @@ export async function registerParticipant(body: any): Promise<any> {
     const participant_id = generateUUID();
     const now = formatDate();
 
-    // Insere participante
-    insert('participants', {
+    // Prepara dados para inserção
+    const insertData = {
       id: participant_id,
-      voluntary_email: sanitizeString(voluntary_email),
+      voluntary_email: voluntary_email.toLowerCase().trim(),
       voluntary_code,
-      voluntary_name: sanitizeString(voluntary_name),
+      voluntary_name: voluntary_name.trim(),
       carry_code,
       created_at: now,
       updated_at: now,
       status: 'active',
+    };
+
+    // Debug: verificar dados antes de inserir
+    logger.info('Dados a serem inseridos no banco', {
+      insertData,
+      emailValue: insertData.voluntary_email,
+      emailType: typeof insertData.voluntary_email
     });
+
+    // Insere participante
+    insert('participants', insertData);
 
     logger.info('Novo participante registrado', {
       participant_id,
@@ -109,7 +129,7 @@ export async function loginParticipant(body: any): Promise<any> {
 
     // Busca participante por VOLUNTARY_CODE ou CARRY_CODE
     let participant = queryOne<Participant>(
-      'SELECT * FROM participants WHERE voluntary_code = :code OR carry_code = :code',
+      'SELECT * FROM participants WHERE voluntary_code = $code OR carry_code = $code',
       { code: upperCode }
     );
 
@@ -129,13 +149,11 @@ export async function loginParticipant(body: any): Promise<any> {
     const token = generateToken({
       participant_id: participant.id,
       voluntary_code: participant.voluntary_code,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 dias
     });
 
     // Busca amostras do participante
     const samples = queryAll<Sample>(
-      'SELECT * FROM samples WHERE participant_id = :participant_id ORDER BY created_at DESC',
+      'SELECT * FROM samples WHERE participant_id = $participant_id ORDER BY created_at DESC',
       { participant_id: participant.id }
     );
 
@@ -203,7 +221,7 @@ export async function updateParticipant(
       if (!isValidName(body.voluntary_name)) {
         throw new ValidationError('Nome inválido');
       }
-      updates.voluntary_name = sanitizeString(body.voluntary_name);
+      updates.voluntary_name = body.voluntary_name.trim();
     }
 
     if (Object.keys(updates).length === 0) {

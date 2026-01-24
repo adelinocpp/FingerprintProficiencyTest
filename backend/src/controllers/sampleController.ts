@@ -1,6 +1,6 @@
 import { queryOne, queryAll, insert } from '@database/db';
 import { NotFoundError, successResponse } from '@middleware/errorHandler';
-import { Sample, Group, GroupImage } from '@types/index';
+import { Sample, Group, GroupImage } from '../types/index';
 import { logger } from '@middleware/logger';
 
 /**

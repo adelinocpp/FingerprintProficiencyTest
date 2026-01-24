@@ -1,4 +1,4 @@
-import { ApiResponse, LoginRequest, RegisterRequest, ResultSubmission } from '@types/index';
+import { ApiResponse, LoginRequest, RegisterRequest, ResultSubmission } from '../types/index';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -11,10 +11,13 @@ async function request<T>(
 ): Promise<ApiResponse<T>> {
   const { token, ...fetchOptions } = options;
 
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...fetchOptions.headers,
   };
+
+  if (fetchOptions.headers) {
+    Object.assign(headers, fetchOptions.headers);
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;

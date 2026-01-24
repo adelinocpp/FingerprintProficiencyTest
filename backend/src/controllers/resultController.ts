@@ -1,7 +1,8 @@
 import { insert, queryOne, queryAll, update } from '@database/db';
-import { validateWithZod, ResultSubmissionSchema, ResultBatchSchema } from '@middleware/validation';
+import { validateWithZod } from '@middleware/validation';
+import { ResultSubmissionSchema } from '@utils/validators';
 import { ValidationError, NotFoundError, successResponse } from '@middleware/errorHandler';
-import { Result, Sample, Group, ResultSubmissionInput } from '@types/index';
+import { Result, Sample, Group } from '../types/index';
 import { generateUUID, formatDate } from '@utils/helpers';
 import { isValidImageIndex, isValidCompatibilityDegree } from '@utils/security';
 import { sendEmail, getCertificateEmailTemplate } from '@services/emailService';

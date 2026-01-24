@@ -20,7 +20,13 @@ export const env = {
   EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'gmail',
   EMAIL_USER: process.env.EMAIL_USER || '',
   EMAIL_PASSWORD: process.env.EMAIL_PASSWORD || '',
-  EMAIL_FROM: process.env.EMAIL_FROM || 'noreply@fingerprinttest.com',
+  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || 'Teste de Proficiência',
+  EMAIL_FROM_EMAIL: process.env.EMAIL_FROM_EMAIL || process.env.EMAIL_USER || 'noreply@fingerprinttest.com',
+  
+  // SMTP Configuration (for Yahoo and custom providers)
+  SMTP_HOST: process.env.SMTP_HOST || '',
+  SMTP_PORT: parseInt(process.env.SMTP_PORT || '587', 10),
+  SMTP_SECURE: process.env.SMTP_SECURE === 'true',
 
   // Paths
   IMAGE_SOURCE_PATH: process.env.IMAGE_SOURCE_PATH || './data/images',

@@ -1,6 +1,6 @@
 import { verifyToken } from '@utils/security';
 import { logger } from './logger';
-import { JwtPayload } from '@types/index';
+import { JwtPayload } from '../types/index';
 
 /**
  * Extrai token do header Authorization
@@ -38,26 +38,21 @@ export function validateAuthToken(token: string | null): JwtPayload | null {
 /**
  * Cria middleware de autenticação
  */
-export function createAuthMiddleware() {
-  return {
-    beforeHandle: ({ request, set }: any) => {
-      const authHeader = request.headers.get('authorization');
-      const token = extractToken(authHeader);
-      const payload = validateAuthToken(token);
+export function createAuthMiddleware(app: any) {
+  return app.derive(({ request, set }: any) => {
+    const authHeader = request.headers.get('authorization');
+    const token = extractToken(authHeader);
+    const payload = validateAuthToken(token);
 
-      if (!payload) {
-        set.status = 401;
-        return {
-          success: false,
-          error: 'Não autorizado',
-          message: 'Token inválido ou expirado',
-        };
-      }
+    if (!payload) {
+      set.status = 401;
+      throw new Error('Não autorizado');
+    }
 
-      // Adiciona payload ao contexto
-      request.user = payload;
-    },
-  };
+    return {
+      user: payload
+    };
+  });
 }
 
 /**
