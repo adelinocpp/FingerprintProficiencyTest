@@ -1,0 +1,195 @@
+{
+  "app": {
+    "title": "Teste de Proficiência em Impressões Digitais",
+    "subtitle": "Sistema de Avaliação Cega para Peritos Criminais"
+  },
+  "nav": {
+    "home": "Início",
+    "register": "Cadastro",
+    "login": "Acesso",
+    "dashboard": "Painel",
+    "samples": "Amostras",
+    "results": "Resultados",
+    "profile": "Perfil",
+    "logout": "Sair"
+  },
+  "auth": {
+    "register": {
+      "title": "Cadastro de Participante",
+      "description": "Preencha os dados abaixo para se cadastrar no sistema",
+      "email": "Email",
+      "emailPlaceholder": "seu.email@exemplo.com",
+      "emailHelp": "Seu email será usado para enviar as amostras e certificado",
+      "name": "Nome Completo",
+      "namePlaceholder": "Seu Nome Completo",
+      "nameHelp": "Digite seu nome completo conforme documento de identidade",
+      "terms": "Aceito os termos e condições",
+      "termsHelp": "Você deve aceitar os termos para se cadastrar",
+      "submit": "Cadastrar",
+      "submitting": "Cadastrando...",
+      "success": "Cadastro realizado com sucesso! Verifique seu email.",
+      "error": "Erro ao cadastrar. Tente novamente.",
+      "emailExists": "Este email já está cadastrado",
+      "loginLink": "Já tem conta? Faça login"
+    },
+    "login": {
+      "title": "Acesso ao Sistema",
+      "description": "Use seu código de participante para acessar",
+      "code": "Código de Participante",
+      "codePlaceholder": "Ex: AB1234",
+      "codeHelp": "Use seu código pessoal (VOLUNTARY_CODE) ou código da amostra (CARRY_CODE)",
+      "submit": "Acessar",
+      "submitting": "Acessando...",
+      "success": "Login realizado com sucesso!",
+      "error": "Erro ao fazer login. Verifique seu código.",
+      "invalidCode": "Código inválido",
+      "registerLink": "Não tem conta? Cadastre-se"
+    }
+  },
+  "dashboard": {
+    "title": "Painel de Controle",
+    "welcome": "Bem-vindo, {name}!",
+    "stats": {
+      "totalSamples": "Amostras Recebidas",
+      "totalGroups": "Grupos para Avaliar",
+      "completedGroups": "Grupos Avaliados",
+      "progress": "Progresso Geral"
+    },
+    "samples": {
+      "title": "Suas Amostras",
+      "empty": "Nenhuma amostra disponível",
+      "status": {
+        "pending": "Pendente",
+        "in_progress": "Em Progresso",
+        "completed": "Concluído"
+      },
+      "actions": {
+        "view": "Ver Detalhes",
+        "evaluate": "Avaliar",
+        "download": "Baixar"
+      }
+    }
+  },
+  "samples": {
+    "title": "Amostras",
+    "details": "Detalhes da Amostra",
+    "groups": "Grupos para Avaliar",
+    "progress": "Progresso",
+    "groupsEvaluated": "{completed} de {total} grupos avaliados",
+    "group": {
+      "title": "Grupo {index}",
+      "status": "Status",
+      "images": "Imagens",
+      "questionada": "Impressão Questionada",
+      "padrao": "Impressão Padrão",
+      "evaluate": "Avaliar Grupo"
+    }
+  },
+  "evaluation": {
+    "title": "Avaliação de Grupo",
+    "instructions": "Instruções para Avaliação",
+    "instructionsText": "Analise a impressão questionada e compare com as impressões padrão. Indique se existe uma correspondência e o grau de compatibilidade.",
+    "questionada": "Impressão Questionada",
+    "padroes": "Impressões Padrão",
+    "conclusive": "Exame Conclusivo",
+    "conclusiveYes": "Sim, consegui determinar",
+    "conclusiveNo": "Não, inconclusivo",
+    "hasMatch": "Há correspondência?",
+    "matchYes": "Sim",
+    "matchNo": "Não",
+    "selectImage": "Selecione a imagem correspondente",
+    "compatibility": "Grau de Compatibilidade",
+    "compatibilityLevels": {
+      "1": "Levemente compatível",
+      "2": "Moderadamente compatível",
+      "3": "Fortemente compatível",
+      "4": "Muito fortemente compatível"
+    },
+    "notes": "Notas Adicionais (opcional)",
+    "notesPlaceholder": "Adicione observações sobre a avaliação",
+    "submit": "Submeter Resultado",
+    "submitting": "Submetendo...",
+    "success": "Resultado submetido com sucesso!",
+    "error": "Erro ao submeter resultado. Tente novamente.",
+    "validation": {
+      "conclusiveRequired": "Indique se o exame foi conclusivo",
+      "matchRequired": "Indique se há correspondência",
+      "imageRequired": "Selecione uma imagem",
+      "compatibilityRequired": "Selecione o grau de compatibilidade"
+    }
+  },
+  "results": {
+    "title": "Resultados",
+    "statistics": "Estatísticas",
+    "summary": "Resumo dos Resultados",
+    "totalEvaluated": "Total Avaliado",
+    "conclusiveResults": "Resultados Conclusivos",
+    "withMatch": "Com Correspondência",
+    "withoutMatch": "Sem Correspondência",
+    "certificate": "Certificado de Participação",
+    "downloadCertificate": "Baixar Certificado",
+    "certificateReady": "Seu certificado está pronto!",
+    "certificateEmail": "Um certificado foi enviado para seu email"
+  },
+  "profile": {
+    "title": "Perfil",
+    "personalData": "Dados Pessoais",
+    "email": "Email",
+    "name": "Nome",
+    "voluntaryCode": "Código Pessoal",
+    "carryCode": "Código da Amostra",
+    "status": "Status",
+    "joinDate": "Data de Cadastro",
+    "lastAccess": "Último Acesso",
+    "edit": "Editar",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "success": "Perfil atualizado com sucesso",
+    "error": "Erro ao atualizar perfil"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "warning": "Aviso",
+    "info": "Informação",
+    "close": "Fechar",
+    "back": "Voltar",
+    "next": "Próximo",
+    "previous": "Anterior",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "delete": "Deletar",
+    "edit": "Editar",
+    "view": "Ver",
+    "download": "Baixar",
+    "upload": "Enviar",
+    "search": "Pesquisar",
+    "filter": "Filtrar",
+    "sort": "Ordenar",
+    "noData": "Nenhum dado disponível",
+    "confirmDelete": "Tem certeza que deseja deletar?",
+    "confirmLogout": "Tem certeza que deseja sair?",
+    "required": "Campo obrigatório",
+    "invalidEmail": "Email inválido",
+    "invalidCode": "Código inválido",
+    "tryAgain": "Tente Novamente",
+    "contactSupport": "Entre em contato com o suporte"
+  },
+  "terms": {
+    "title": "Termos e Condições",
+    "accept": "Aceitar",
+    "decline": "Recusar",
+    "content": "Conteúdo dos termos e condições..."
+  },
+  "errors": {
+    "notFound": "Página não encontrada",
+    "unauthorized": "Não autorizado",
+    "forbidden": "Acesso negado",
+    "serverError": "Erro no servidor",
+    "networkError": "Erro de conexão",
+    "timeoutError": "Tempo limite excedido",
+    "validationError": "Erro de validação",
+    "unknownError": "Erro desconhecido"
+  }
+}

@@ -1,0 +1,195 @@
+{
+  "app": {
+    "title": "Fingerprint Proficiency Test",
+    "subtitle": "Blind Evaluation System for Forensic Experts"
+  },
+  "nav": {
+    "home": "Home",
+    "register": "Register",
+    "login": "Login",
+    "dashboard": "Dashboard",
+    "samples": "Samples",
+    "results": "Results",
+    "profile": "Profile",
+    "logout": "Logout"
+  },
+  "auth": {
+    "register": {
+      "title": "Participant Registration",
+      "description": "Fill in the information below to register in the system",
+      "email": "Email",
+      "emailPlaceholder": "your.email@example.com",
+      "emailHelp": "Your email will be used to send samples and certificate",
+      "name": "Full Name",
+      "namePlaceholder": "Your Full Name",
+      "nameHelp": "Enter your full name as shown in your ID",
+      "terms": "I accept the terms and conditions",
+      "termsHelp": "You must accept the terms to register",
+      "submit": "Register",
+      "submitting": "Registering...",
+      "success": "Registration completed successfully! Check your email.",
+      "error": "Error during registration. Try again.",
+      "emailExists": "This email is already registered",
+      "loginLink": "Already have an account? Login"
+    },
+    "login": {
+      "title": "System Access",
+      "description": "Use your participant code to access",
+      "code": "Participant Code",
+      "codePlaceholder": "Ex: AB1234",
+      "codeHelp": "Use your personal code (VOLUNTARY_CODE) or sample code (CARRY_CODE)",
+      "submit": "Access",
+      "submitting": "Accessing...",
+      "success": "Login successful!",
+      "error": "Login error. Check your code.",
+      "invalidCode": "Invalid code",
+      "registerLink": "Don't have an account? Register"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome, {name}!",
+    "stats": {
+      "totalSamples": "Samples Received",
+      "totalGroups": "Groups to Evaluate",
+      "completedGroups": "Groups Evaluated",
+      "progress": "Overall Progress"
+    },
+    "samples": {
+      "title": "Your Samples",
+      "empty": "No samples available",
+      "status": {
+        "pending": "Pending",
+        "in_progress": "In Progress",
+        "completed": "Completed"
+      },
+      "actions": {
+        "view": "View Details",
+        "evaluate": "Evaluate",
+        "download": "Download"
+      }
+    }
+  },
+  "samples": {
+    "title": "Samples",
+    "details": "Sample Details",
+    "groups": "Groups to Evaluate",
+    "progress": "Progress",
+    "groupsEvaluated": "{completed} of {total} groups evaluated",
+    "group": {
+      "title": "Group {index}",
+      "status": "Status",
+      "images": "Images",
+      "questionada": "Questioned Fingerprint",
+      "padrao": "Standard Fingerprint",
+      "evaluate": "Evaluate Group"
+    }
+  },
+  "evaluation": {
+    "title": "Group Evaluation",
+    "instructions": "Evaluation Instructions",
+    "instructionsText": "Analyze the questioned fingerprint and compare with the standard fingerprints. Indicate if there is a match and the degree of compatibility.",
+    "questionada": "Questioned Fingerprint",
+    "padroes": "Standard Fingerprints",
+    "conclusive": "Conclusive Examination",
+    "conclusiveYes": "Yes, I could determine",
+    "conclusiveNo": "No, inconclusive",
+    "hasMatch": "Is there a match?",
+    "matchYes": "Yes",
+    "matchNo": "No",
+    "selectImage": "Select the matching image",
+    "compatibility": "Degree of Compatibility",
+    "compatibilityLevels": {
+      "1": "Slightly compatible",
+      "2": "Moderately compatible",
+      "3": "Strongly compatible",
+      "4": "Very strongly compatible"
+    },
+    "notes": "Additional Notes (optional)",
+    "notesPlaceholder": "Add observations about the evaluation",
+    "submit": "Submit Result",
+    "submitting": "Submitting...",
+    "success": "Result submitted successfully!",
+    "error": "Error submitting result. Try again.",
+    "validation": {
+      "conclusiveRequired": "Indicate if the examination was conclusive",
+      "matchRequired": "Indicate if there is a match",
+      "imageRequired": "Select an image",
+      "compatibilityRequired": "Select the degree of compatibility"
+    }
+  },
+  "results": {
+    "title": "Results",
+    "statistics": "Statistics",
+    "summary": "Results Summary",
+    "totalEvaluated": "Total Evaluated",
+    "conclusiveResults": "Conclusive Results",
+    "withMatch": "With Match",
+    "withoutMatch": "Without Match",
+    "certificate": "Certificate of Participation",
+    "downloadCertificate": "Download Certificate",
+    "certificateReady": "Your certificate is ready!",
+    "certificateEmail": "A certificate has been sent to your email"
+  },
+  "profile": {
+    "title": "Profile",
+    "personalData": "Personal Data",
+    "email": "Email",
+    "name": "Name",
+    "voluntaryCode": "Personal Code",
+    "carryCode": "Sample Code",
+    "status": "Status",
+    "joinDate": "Registration Date",
+    "lastAccess": "Last Access",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "success": "Profile updated successfully",
+    "error": "Error updating profile"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Information",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "download": "Download",
+    "upload": "Upload",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "noData": "No data available",
+    "confirmDelete": "Are you sure you want to delete?",
+    "confirmLogout": "Are you sure you want to logout?",
+    "required": "Required field",
+    "invalidEmail": "Invalid email",
+    "invalidCode": "Invalid code",
+    "tryAgain": "Try Again",
+    "contactSupport": "Contact support"
+  },
+  "terms": {
+    "title": "Terms and Conditions",
+    "accept": "Accept",
+    "decline": "Decline",
+    "content": "Terms and conditions content..."
+  },
+  "errors": {
+    "notFound": "Page not found",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Access denied",
+    "serverError": "Server error",
+    "networkError": "Connection error",
+    "timeoutError": "Request timeout",
+    "validationError": "Validation error",
+    "unknownError": "Unknown error"
+  }
+}

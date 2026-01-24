@@ -1,0 +1,195 @@
+{
+  "app": {
+    "title": "Prueba de Competencia en Huellas Dactilares",
+    "subtitle": "Sistema de Evaluación Ciega para Peritos Forenses"
+  },
+  "nav": {
+    "home": "Inicio",
+    "register": "Registro",
+    "login": "Acceso",
+    "dashboard": "Panel",
+    "samples": "Muestras",
+    "results": "Resultados",
+    "profile": "Perfil",
+    "logout": "Cerrar Sesión"
+  },
+  "auth": {
+    "register": {
+      "title": "Registro de Participante",
+      "description": "Complete la información a continuación para registrarse en el sistema",
+      "email": "Correo Electrónico",
+      "emailPlaceholder": "su.correo@ejemplo.com",
+      "emailHelp": "Su correo será utilizado para enviar las muestras y certificado",
+      "name": "Nombre Completo",
+      "namePlaceholder": "Su Nombre Completo",
+      "nameHelp": "Ingrese su nombre completo como aparece en su documento de identidad",
+      "terms": "Acepto los términos y condiciones",
+      "termsHelp": "Debe aceptar los términos para registrarse",
+      "submit": "Registrarse",
+      "submitting": "Registrando...",
+      "success": "¡Registro completado exitosamente! Verifique su correo.",
+      "error": "Error durante el registro. Intente nuevamente.",
+      "emailExists": "Este correo ya está registrado",
+      "loginLink": "¿Ya tiene cuenta? Inicie sesión"
+    },
+    "login": {
+      "title": "Acceso al Sistema",
+      "description": "Use su código de participante para acceder",
+      "code": "Código de Participante",
+      "codePlaceholder": "Ej: AB1234",
+      "codeHelp": "Use su código personal (VOLUNTARY_CODE) o código de muestra (CARRY_CODE)",
+      "submit": "Acceder",
+      "submitting": "Accediendo...",
+      "success": "¡Inicio de sesión exitoso!",
+      "error": "Error al iniciar sesión. Verifique su código.",
+      "invalidCode": "Código inválido",
+      "registerLink": "¿No tiene cuenta? Regístrese"
+    }
+  },
+  "dashboard": {
+    "title": "Panel de Control",
+    "welcome": "¡Bienvenido, {name}!",
+    "stats": {
+      "totalSamples": "Muestras Recibidas",
+      "totalGroups": "Grupos para Evaluar",
+      "completedGroups": "Grupos Evaluados",
+      "progress": "Progreso General"
+    },
+    "samples": {
+      "title": "Sus Muestras",
+      "empty": "No hay muestras disponibles",
+      "status": {
+        "pending": "Pendiente",
+        "in_progress": "En Progreso",
+        "completed": "Completado"
+      },
+      "actions": {
+        "view": "Ver Detalles",
+        "evaluate": "Evaluar",
+        "download": "Descargar"
+      }
+    }
+  },
+  "samples": {
+    "title": "Muestras",
+    "details": "Detalles de la Muestra",
+    "groups": "Grupos para Evaluar",
+    "progress": "Progreso",
+    "groupsEvaluated": "{completed} de {total} grupos evaluados",
+    "group": {
+      "title": "Grupo {index}",
+      "status": "Estado",
+      "images": "Imágenes",
+      "questionada": "Huella Cuestionada",
+      "padrao": "Huella Estándar",
+      "evaluate": "Evaluar Grupo"
+    }
+  },
+  "evaluation": {
+    "title": "Evaluación de Grupo",
+    "instructions": "Instrucciones de Evaluación",
+    "instructionsText": "Analice la huella cuestionada y compárela con las huellas estándar. Indique si existe una coincidencia y el grado de compatibilidad.",
+    "questionada": "Huella Cuestionada",
+    "padroes": "Huellas Estándar",
+    "conclusive": "Examen Concluyente",
+    "conclusiveYes": "Sí, pude determinar",
+    "conclusiveNo": "No, inconclusivo",
+    "hasMatch": "¿Hay coincidencia?",
+    "matchYes": "Sí",
+    "matchNo": "No",
+    "selectImage": "Seleccione la imagen coincidente",
+    "compatibility": "Grado de Compatibilidad",
+    "compatibilityLevels": {
+      "1": "Ligeramente compatible",
+      "2": "Moderadamente compatible",
+      "3": "Fuertemente compatible",
+      "4": "Muy fuertemente compatible"
+    },
+    "notes": "Notas Adicionales (opcional)",
+    "notesPlaceholder": "Agregue observaciones sobre la evaluación",
+    "submit": "Enviar Resultado",
+    "submitting": "Enviando...",
+    "success": "¡Resultado enviado exitosamente!",
+    "error": "Error al enviar resultado. Intente nuevamente.",
+    "validation": {
+      "conclusiveRequired": "Indique si el examen fue concluyente",
+      "matchRequired": "Indique si hay coincidencia",
+      "imageRequired": "Seleccione una imagen",
+      "compatibilityRequired": "Seleccione el grado de compatibilidad"
+    }
+  },
+  "results": {
+    "title": "Resultados",
+    "statistics": "Estadísticas",
+    "summary": "Resumen de Resultados",
+    "totalEvaluated": "Total Evaluado",
+    "conclusiveResults": "Resultados Concluyentes",
+    "withMatch": "Con Coincidencia",
+    "withoutMatch": "Sin Coincidencia",
+    "certificate": "Certificado de Participación",
+    "downloadCertificate": "Descargar Certificado",
+    "certificateReady": "¡Su certificado está listo!",
+    "certificateEmail": "Un certificado ha sido enviado a su correo"
+  },
+  "profile": {
+    "title": "Perfil",
+    "personalData": "Datos Personales",
+    "email": "Correo Electrónico",
+    "name": "Nombre",
+    "voluntaryCode": "Código Personal",
+    "carryCode": "Código de Muestra",
+    "status": "Estado",
+    "joinDate": "Fecha de Registro",
+    "lastAccess": "Último Acceso",
+    "edit": "Editar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "success": "Perfil actualizado exitosamente",
+    "error": "Error al actualizar perfil"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "warning": "Advertencia",
+    "info": "Información",
+    "close": "Cerrar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "view": "Ver",
+    "download": "Descargar",
+    "upload": "Cargar",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "sort": "Ordenar",
+    "noData": "No hay datos disponibles",
+    "confirmDelete": "¿Está seguro de que desea eliminar?",
+    "confirmLogout": "¿Está seguro de que desea cerrar sesión?",
+    "required": "Campo requerido",
+    "invalidEmail": "Correo inválido",
+    "invalidCode": "Código inválido",
+    "tryAgain": "Intentar de Nuevo",
+    "contactSupport": "Contactar soporte"
+  },
+  "terms": {
+    "title": "Términos y Condiciones",
+    "accept": "Aceptar",
+    "decline": "Rechazar",
+    "content": "Contenido de términos y condiciones..."
+  },
+  "errors": {
+    "notFound": "Página no encontrada",
+    "unauthorized": "No autorizado",
+    "forbidden": "Acceso denegado",
+    "serverError": "Error del servidor",
+    "networkError": "Error de conexión",
+    "timeoutError": "Tiempo de espera agotado",
+    "validationError": "Error de validación",
+    "unknownError": "Error desconocido"
+  }
+}
