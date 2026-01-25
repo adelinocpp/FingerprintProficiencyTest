@@ -85,13 +85,13 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
 }
 
 /**
- * Template de email de boas-vindas
+ * Template de email de boas-vindas com validação
  */
 export function getWelcomeEmailTemplate(
   voluntaryName: string,
   voluntaryCode: string,
   carryCode: string,
-  downloadUrl: string,
+  verificationUrl: string,
   siteUrl: string
 ): string {
   return `
@@ -122,6 +122,13 @@ export function getWelcomeEmailTemplate(
             
             <p>Primeiramente, gostaria de agradecer por se voluntariar ao projeto de avaliação. Informo que seus dados serão anonimizados e nenhum resultado pessoal será divulgado.</p>
             
+            <h3>⚠️ Validação de Email Necessária</h3>
+            <p>Para ativar sua conta e acessar o sistema, você precisa validar seu email clicando no botão abaixo:</p>
+            
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="${verificationUrl}" class="button" style="background-color: #27ae60; font-size: 16px; padding: 15px 30px;">✓ Validar Email e Ativar Conta</a>
+            </p>
+            
             <h3>Seus Códigos de Acesso:</h3>
             
             <div class="code-box">
@@ -134,26 +141,24 @@ export function getWelcomeEmailTemplate(
               <div class="code-value">${carryCode}</div>
             </div>
             
-            <p>Você está recebendo um arquivo compactado com dez grupos de imagens de impressões para avaliação. Em cada grupo há uma imagem questionada e 10 padrões. A avaliação consiste em indicar se existe (ou não) uma impressão padrão que é compatível com a questionada e sua escala de compatibilidade.</p>
+            <p><strong>Guarde estes códigos!</strong> Você precisará de um deles para fazer login após validar seu email.</p>
             
             <h3>Próximos Passos:</h3>
             <ol>
-              <li>Baixe o arquivo de amostras anexado</li>
-              <li>Extraia o arquivo em seu computador</li>
-              <li>Analise cada grupo de imagens conforme as instruções</li>
-              <li>Acesse o sistema para entregar seus resultados</li>
+              <li><strong>Valide seu email</strong> clicando no botão acima</li>
+              <li>Faça login no sistema usando um dos seus códigos</li>
+              <li>Aguarde o recebimento das amostras para avaliação</li>
+              <li>Analise as impressões digitais conforme instruções</li>
+              <li>Submeta seus resultados através do sistema</li>
             </ol>
-            
-            <p style="text-align: center;">
-              <a href="${siteUrl}" class="button">Acessar Sistema</a>
-            </p>
             
             <p><strong>Informações Importantes:</strong></p>
             <ul>
-              <li>Mantenha este email até a entrega da avaliação</li>
-              <li>O sistema considera seu tempo de resposta a partir do cadastro</li>
-              <li>Caso não responda sua avaliação em até 120 dias, sua amostra será dispensada</li>
-              <li>Use seu código pessoal ou código da amostra para acessar o sistema</li>
+              <li>Você deve validar seu email antes de acessar o sistema</li>
+              <li>Mantenha este email até a conclusão da avaliação</li>
+              <li>Use seu código pessoal (VOLUNTARY_CODE) ou código da amostra (CARRY_CODE) para fazer login</li>
+              <li>O link de validação expira em 7 dias</li>
+              <li>Caso não valide seu email, não poderá acessar as amostras</li>
             </ul>
             
             <p>Muito obrigado pela participação!</p>
@@ -217,6 +222,87 @@ export function getCertificateEmailTemplate(
             </div>
             
             <p>Agradecemos sinceramente sua participação neste projeto de pesquisa. Seus dados foram fundamentais para o desenvolvimento deste sistema de avaliação de impressões digitais.</p>
+            
+            <p>Atenciosamente,<br>
+            <strong>Dr. Adelino Pinheiro Silva</strong></p>
+          </div>
+          
+          <div class="footer">
+            <p>Este é um email automático. Por favor, não responda. Se tiver dúvidas, entre em contato através do sistema.</p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+}
+
+/**
+ * Template de email de lembrete de códigos
+ */
+export function getReminderEmailTemplate(
+  voluntaryName: string,
+  voluntaryCode: string,
+  carryCode: string,
+  siteUrl: string
+): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #3498db; color: white; padding: 20px; text-align: center; border-radius: 5px; }
+          .content { padding: 20px; background-color: #f9f9f9; border-radius: 5px; margin-top: 20px; }
+          .code-box { background-color: #ecf0f1; padding: 15px; border-left: 4px solid #3498db; margin: 15px 0; }
+          .code-label { font-weight: bold; color: #2c3e50; }
+          .code-value { font-size: 18px; font-family: monospace; color: #e74c3c; }
+          .button { display: inline-block; padding: 10px 20px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+          .footer { text-align: center; padding: 20px; color: #7f8c8d; font-size: 12px; }
+          .alert { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📧 Seus Códigos de Acesso</h1>
+          </div>
+          
+          <div class="content">
+            <p>Olá <strong>${voluntaryName}</strong>,</p>
+            
+            <div class="alert">
+              <p><strong>ℹ️ Este email já está cadastrado</strong></p>
+              <p>Você tentou se cadastrar novamente, mas este email já possui uma conta ativa. Abaixo estão seus códigos de acesso:</p>
+            </div>
+            
+            <h3>Seus Códigos de Acesso:</h3>
+            
+            <div class="code-box">
+              <div class="code-label">Código Pessoal (VOLUNTARY_CODE):</div>
+              <div class="code-value">${voluntaryCode}</div>
+            </div>
+            
+            <div class="code-box">
+              <div class="code-label">Código da Amostra (CARRY_CODE):</div>
+              <div class="code-value">${carryCode}</div>
+            </div>
+            
+            <p><strong>Use qualquer um destes códigos para fazer login no sistema.</strong></p>
+            
+            <p style="text-align: center;">
+              <a href="${siteUrl}/login" class="button">Acessar Sistema</a>
+            </p>
+            
+            <p><strong>Informações Importantes:</strong></p>
+            <ul>
+              <li>Se você validou seu email, já pode fazer login</li>
+              <li>Se ainda não validou, verifique seu email de boas-vindas original</li>
+              <li>Caso não encontre o email de validação, entre em contato</li>
+            </ul>
+            
+            <p>Se você não solicitou este email, desconsidere esta mensagem.</p>
             
             <p>Atenciosamente,<br>
             <strong>Dr. Adelino Pinheiro Silva</strong></p>

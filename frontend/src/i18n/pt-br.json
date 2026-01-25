@@ -51,9 +51,13 @@
     "submit": "Cadastrar",
     "processing": "Processando cadastro...",
     "success": "Cadastro Realizado com Sucesso!",
-    "success_message": "Seu cadastro foi realizado. Guarde seus códigos de acesso:",
+    "success_message": "Verifique seu email para validar sua conta. Guarde seus códigos de acesso:",
+    "already_registered": "Email Já Cadastrado",
+    "codes_resent_message": "Reenviamos um email com suas informações de acesso.",
+    "verify_email_resent": "Email de validação reenviado! Verifique sua caixa de entrada.",
+    "verify_email_required": "⚠️ Você precisa validar seu email antes de fazer login",
     "voluntary_code": "Código Voluntário",
-    "carry_code": "Código de Transporte",
+    "carry_code": "Código da Amostra",
     "important": "Importante",
     "tip1": "Guarde estes códigos em local seguro",
     "tip2": "Você receberá um email com instruções",
@@ -63,7 +67,7 @@
   },
   "login": {
     "title": "Login",
-    "instruction": "Digite seu código de acesso (Código Voluntário ou Código de Transporte)",
+    "instruction": "Digite seu código de acesso (Código Voluntário ou Código da Amostra)",
     "code": "Código de Acesso",
     "code_placeholder": "ABC123 ou XYZ45",
     "help_title": "Não possui código?",
@@ -81,7 +85,7 @@
     "name": "Nome",
     "email": "Email",
     "voluntary_code": "Código Voluntário",
-    "carry_code": "Código de Transporte",
+    "carry_code": "Código da Amostra",
     "samples": "Minhas Amostras",
     "sample": "Amostra",
     "no_samples": "Nenhuma amostra disponível no momento.",
@@ -93,7 +97,7 @@
     "loading": "Carregando amostra...",
     "title": "Detalhes da Amostra",
     "id": "ID",
-    "carry_code": "Código de Transporte",
+    "carry_code": "Código da Amostra",
     "status": "Status",
     "created": "Criado em",
     "progress": "Progresso",
@@ -140,8 +144,18 @@
   },
   "status": {
     "pending": "Pendente",
-    "in_progress": "Em Progresso",
+    "in_progress": "Em Andamento",
     "completed": "Concluído",
     "expired": "Expirado"
+  },
+  "verify": {
+    "validating": "Validando Email...",
+    "please_wait": "Por favor, aguarde enquanto validamos seu email.",
+    "success": "Email Validado!",
+    "error": "Erro na Validação",
+    "already_verified": "Já Validado",
+    "go_to_login": "Fazer Login",
+    "go_to_home": "Voltar para Home",
+    "register_again": "Cadastrar Novamente"
   }
 }

@@ -205,11 +205,11 @@ export function update(
   where: Record<string, any>
 ): any {
   const sets = Object.keys(data)
-    .map((key) => `${key} = :${key}`)
+    .map((key) => `${key} = $${key}`)
     .join(', ');
   
   const conditions = Object.keys(where)
-    .map((key) => `${key} = :where_${key}`)
+    .map((key) => `${key} = $where_${key}`)
     .join(' AND ');
   
   const params = {
@@ -220,6 +220,13 @@ export function update(
   };
   
   const query = `UPDATE ${table} SET ${sets} WHERE ${conditions}`;
+  
+  logger.info('UPDATE Query Debug', {
+    table,
+    query,
+    params
+  });
+  
   return execute(query, params);
 }
 

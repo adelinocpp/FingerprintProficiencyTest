@@ -228,9 +228,13 @@
     "submit": "Registrar",
     "processing": "Procesando registro...",
     "success": "¡Registro Completado con Éxito!",
-    "success_message": "Su registro se ha completado. Guarde sus códigos de acceso:",
+    "success_message": "Verifique su correo electrónico para validar su cuenta. Guarde sus códigos de acceso:",
+    "already_registered": "Correo Ya Registrado",
+    "codes_resent_message": "Hemos reenviado un correo electrónico con su información de acceso.",
+    "verify_email_resent": "¡Correo de verificación reenviado! Verifique su bandeja de entrada.",
+    "verify_email_required": "⚠️ Debe validar su correo electrónico antes de iniciar sesión",
     "voluntary_code": "Código Voluntario",
-    "carry_code": "Código de Transporte",
+    "carry_code": "Código de Muestra",
     "important": "Importante",
     "tip1": "Mantenga estos códigos en un lugar seguro",
     "tip2": "Recibirá un correo electrónico con instrucciones",
@@ -240,7 +244,7 @@
   },
   "login": {
     "title": "Inicio de Sesión",
-    "instruction": "Ingrese su código de acceso (Código Voluntario o Código de Transporte)",
+    "instruction": "Ingrese su código de acceso (Código Voluntario o Código de Muestra)",
     "code": "Código de Acceso",
     "code_placeholder": "ABC123 o XYZ45",
     "help_title": "¿No tiene código?",
@@ -258,7 +262,7 @@
     "name": "Nombre",
     "email": "Correo Electrónico",
     "voluntary_code": "Código Voluntario",
-    "carry_code": "Código de Transporte",
+    "carry_code": "Código de Muestra",
     "samples": "Mis Muestras",
     "sample": "Muestra",
     "no_samples": "No hay muestras disponibles en este momento.",
@@ -270,7 +274,7 @@
     "loading": "Cargando muestra...",
     "title": "Detalles de la Muestra",
     "id": "ID",
-    "carry_code": "Código de Transporte",
+    "carry_code": "Código de Muestra",
     "status": "Estado",
     "created": "Creado el",
     "progress": "Progreso",
@@ -310,5 +314,15 @@
     "in_progress": "En Progreso",
     "completed": "Completado",
     "expired": "Expirado"
+  },
+  "verify": {
+    "validating": "Validando Correo...",
+    "please_wait": "Por favor espere mientras validamos su correo electrónico.",
+    "success": "¡Correo Validado!",
+    "error": "Error de Validación",
+    "already_verified": "Ya Validado",
+    "go_to_login": "Ir a Inicio de Sesión",
+    "go_to_home": "Volver al Inicio",
+    "register_again": "Registrarse de Nuevo"
   }
 }

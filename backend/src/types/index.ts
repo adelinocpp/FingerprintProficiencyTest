@@ -5,6 +5,10 @@ export interface Participant {
   voluntary_code: string;
   voluntary_name: string;
   carry_code: string;
+  email_verified: number;
+  email_verification_token: string | null;
+  token_expires_at: string | null;
+  email_verified_at: string | null;
   created_at: string;
   updated_at: string;
   last_access: string | null;

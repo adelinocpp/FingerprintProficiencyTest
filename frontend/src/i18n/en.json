@@ -227,8 +227,12 @@
     "terms": "I agree to participate in the study and accept the terms",
     "submit": "Register",
     "processing": "Processing registration...",
-    "success": "Registration Completed Successfully!",
-    "success_message": "Your registration has been completed. Save your access codes:",
+    "success": "Registration Successful!",
+    "success_message": "Check your email to validate your account. Save your access codes:",
+    "already_registered": "Email Already Registered",
+    "codes_resent_message": "We have resent an email with your access information.",
+    "verify_email_resent": "Verification email resent! Check your inbox.",
+    "verify_email_required": "⚠️ You need to validate your email before logging in",
     "voluntary_code": "Voluntary Code",
     "carry_code": "Carry Code",
     "important": "Important",
@@ -310,5 +314,15 @@
     "in_progress": "In Progress",
     "completed": "Completed",
     "expired": "Expired"
+  },
+  "verify": {
+    "validating": "Validating Email...",
+    "please_wait": "Please wait while we validate your email.",
+    "success": "Email Validated!",
+    "error": "Validation Error",
+    "already_verified": "Already Validated",
+    "go_to_login": "Go to Login",
+    "go_to_home": "Back to Home",
+    "register_again": "Register Again"
   }
 }
