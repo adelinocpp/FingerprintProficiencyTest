@@ -159,7 +159,7 @@ export function getWelcomeEmailTemplate(
               <li>Você deve validar seu email antes de acessar o sistema</li>
               <li>Mantenha este email até a conclusão da avaliação</li>
               <li>Use seu código pessoal (VOLUNTARY_CODE) ou código da amostra (CARRY_CODE) para fazer login</li>
-              <li>O link de validação expira em 7 dias</li>
+              <li>O link de validação expira em 48 horas</li>
               <li>Caso não valide seu email, não poderá acessar as amostras</li>
             </ul>
             

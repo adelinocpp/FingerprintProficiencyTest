@@ -6,7 +6,7 @@ import { Result, Sample, Group } from '../types/index';
 import { generateUUID, formatDate } from '@utils/helpers';
 import { isValidImageIndex, isValidCompatibilityDegree } from '@utils/security';
 import { sendEmail, getCertificateEmailTemplate } from '@services/emailService';
-import { createCertificateData, generateCertificateHTML, saveCertificate } from '@services/certificateService';
+import { createCertificateData, generateCertificateHTML, generateCertificatePDF } from '@services/certificateService';
 import { logger } from '@middleware/logger';
 import { env } from '@config/env';
 
@@ -195,9 +195,9 @@ async function completeSample(participantId: string, sampleId: string): Promise<
     );
 
     const certificateHTML = generateCertificateHTML(certificateData);
-    const certificatePath = `${env.SAMPLES_PATH}/certificates/${participant.carry_code}_certificate.html`;
+    const certificatePath = `${env.SAMPLES_PATH}/certificates/${participant.carry_code}_certificate.pdf`;
 
-    await saveCertificate(certificateHTML, certificatePath);
+    await generateCertificatePDF(certificateHTML, certificatePath);
 
     // Insere registro de certificado
     insert('certificates', {
@@ -224,6 +224,12 @@ async function completeSample(participantId: string, sampleId: string): Promise<
         to: participant.voluntary_email,
         subject: '[PESQUISA EM AMOSTRAS DE DIGITAIS] Certificado de Participação',
         html: emailContent,
+        attachments: [
+          {
+            filename: `certificado_${participant.carry_code}.pdf`,
+            path: certificatePath
+          }
+        ]
       });
 
       logger.info('Email com certificado enviado', {
