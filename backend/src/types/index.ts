@@ -48,6 +48,9 @@ export interface Group {
   group_index: number;
   group_id: string; // 4 letters + 5 numbers
   has_same_source: boolean;
+  questionada_filename: string;
+  padroes_filenames: string; // JSON array
+  matched_image_index: number | null;
   created_at: string;
   status: 'pending' | 'completed';
 }
@@ -112,6 +115,10 @@ export interface EmailPayload {
   subject: string;
   html: string;
   text?: string;
+  attachments?: Array<{
+    filename: string;
+    path: string;
+  }>;
 }
 
 // Certificate Types

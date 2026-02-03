@@ -6,8 +6,11 @@ import { logger } from './middleware/logger';
 
 // Controllers
 import * as authController from './controllers/authController';
-import * as resultController from './controllers/resultController';
 import * as sampleController from './controllers/sampleController';
+import * as groupController from './controllers/groupController';
+import * as imageController from '@controllers/imageController';
+import { downloadSample } from '@controllers/downloadController';
+import * as resultController from './controllers/resultController';
 
 async function startServer() {
   try {
@@ -118,7 +121,7 @@ async function startServer() {
           return { success: false, error: 'Não autorizado' };
         }
         const token = authHeader.replace('Bearer ', '');
-        return await sampleController.getSampleById({ token, sample_id: params.id });
+        return await sampleController.getSampleDetails({ token, sample_id: params.id });
       })
       .get('/api/samples/:id/progress', async ({ params, headers }: any) => {
         const authHeader = headers['authorization'];
@@ -129,13 +132,45 @@ async function startServer() {
         return await sampleController.getSampleProgress({ token, sample_id: params.id });
       })
       // Rotas de grupos
-      .get('/api/groups/:id', async ({ params, headers }: any) => {
-        const authHeader = headers['authorization'];
-        if (!authHeader) {
-          return { success: false, error: 'Não autorizado' };
+      .post('/api/samples/:id/groups', async ({ params }: any) => {
+        return await groupController.createGroupsForSample(params.id);
+      })
+      .get('/api/samples/:id/groups', async ({ params }: any) => {
+        return await groupController.getGroupsBySample(params.id);
+      })
+      .get('/api/groups/:id', async ({ params }: any) => {
+        return await groupController.getGroupById(params.id);
+      })
+      // Rotas de imagens
+      .get('/api/images/:filename', async ({ params }: any) => {
+        const result = await imageController.serveImage(params.filename);
+        if (result.success && result.path) {
+          return Bun.file(result.path);
         }
-        const token = authHeader.replace('Bearer ', '');
-        return await sampleController.getGroupById({ token, group_id: params.id });
+        return result;
+      })
+      .get('/api/sample-images/:carryCode/:groupId/:filename', async ({ params }: any) => {
+        const result = await imageController.serveSampleImage(
+          params.carryCode,
+          params.groupId,
+          params.filename
+        );
+        if (result.success && result.path) {
+          return Bun.file(result.path);
+        }
+        return result;
+      })
+      // Download de amostra
+      .get('/api/samples/:id/download', async ({ params, set }: any) => {
+        try {
+          const { filePath, fileName } = await downloadSample(params.id);
+          set.headers['Content-Type'] = 'application/zip';
+          set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
+          return Bun.file(filePath);
+        } catch (error: any) {
+          set.status = 404;
+          return { success: false, error: error.message || 'Arquivo não encontrado' };
+        }
       })
       // Rotas de resultados
       .post('/api/results', async ({ body, headers }: any) => {
@@ -144,7 +179,15 @@ async function startServer() {
           return { success: false, error: 'Não autorizado' };
         }
         const token = authHeader.replace('Bearer ', '');
-        return await resultController.submitResult({ token, ...body });
+        
+        // Extrai participantId do token
+        const { verifyToken } = await import('@/utils/security');
+        const payload = verifyToken(token);
+        if (!payload || !payload.participant_id) {
+          return { success: false, error: 'Token inválido' };
+        }
+        
+        return await resultController.submitGroupResult(payload.participant_id, body);
       })
       .listen(env.PORT || 3000);
 

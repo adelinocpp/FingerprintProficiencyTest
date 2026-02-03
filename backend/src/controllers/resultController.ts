@@ -33,13 +33,19 @@ export async function submitGroupResult(
       notes,
     } = validation.data;
 
-    // Busca o grupo
+    // Busca o grupo pelo group_id (código ABCD12345)
+    logger.info('Buscando grupo:', { group_id });
+    logger.info('Query SQL:', 'SELECT * FROM groups WHERE group_id = :group_id');
+    logger.info('Params:', { group_id });
     const group = queryOne<Group>(
       'SELECT * FROM groups WHERE group_id = :group_id',
       { group_id }
     );
+    logger.info('Grupo encontrado:', group);
+    logger.info('Tipo do resultado:', typeof group);
 
     if (!group) {
+      logger.error(`Grupo não encontrado no banco: ${group_id}`);
       throw new NotFoundError('Grupo');
     }
 

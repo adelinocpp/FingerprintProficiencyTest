@@ -1,15 +1,14 @@
-import { CertificateData } from '@types/index';
+import { CertificateData } from '../types/index';
 import { generateUUID, formatDateReadable } from '@utils/helpers';
 import { logger } from '@middleware/logger';
 import fs from 'fs';
 import path from 'path';
+import puppeteer from 'puppeteer';
 
 /**
  * Gera certificado em HTML
  */
 export function generateCertificateHTML(data: CertificateData): string {
-  const certificateId = generateUUID();
-  
   return `
     <!DOCTYPE html>
     <html>
@@ -177,7 +176,13 @@ export function generateCertificateHTML(data: CertificateData): string {
                 <p>Data de Emissão</p>
               </div>
             </div>
-            
+
+            <div style="margin-top: 30px; padding: 15px; background-color: rgba(255,255,255,0.2); border-radius: 5px; font-size: 10px; color: #2c3e50; text-align: center;">
+              <p style="margin: 0;"><strong>Apoio:</strong></p>
+              <p style="margin: 5px 0;">Projeto desenvolvido com apoio da FAPEMIG e Rede Mineira de Ciências Forenses</p>
+              <p style="margin: 5px 0; font-family: monospace;"><strong>RED-00120-23</strong></p>
+            </div>
+
             <div class="certificate-code">
               ID: ${data.certificate_id}
             </div>
@@ -210,18 +215,36 @@ export async function saveCertificate(
 }
 
 /**
- * Gera certificado em PDF (usando puppeteer ou similar)
- * Nota: Requer dependência adicional
+ * Gera certificado em PDF usando Puppeteer
  */
 export async function generateCertificatePDF(
   certificateHTML: string,
   outputPath: string
 ): Promise<void> {
   try {
-    // Implementação com puppeteer ou similar
-    // Por enquanto, apenas salva como HTML
-    await saveCertificate(certificateHTML, outputPath.replace('.pdf', '.html'));
-    logger.info('Certificado gerado (HTML)', { path: outputPath });
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(certificateHTML, { waitUntil: 'networkidle0' });
+
+    await page.pdf({
+      path: outputPath,
+      format: 'A4',
+      printBackground: true,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      preferCSSPageSize: true
+    });
+
+    await browser.close();
+    logger.info('Certificado PDF gerado com sucesso', { path: outputPath });
   } catch (error) {
     logger.error('Erro ao gerar certificado PDF', error as Error);
     throw error;

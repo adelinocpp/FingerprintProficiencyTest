@@ -11,6 +11,7 @@ export default function VerifyEmail() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'already_verified'>('loading');
   const [message, setMessage] = useState('');
   const [participantName, setParticipantName] = useState('');
+  const [hasVerified, setHasVerified] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -19,15 +20,17 @@ export default function VerifyEmail() {
     if (!token) {
       setStatus('error');
       setMessage('Token de validação não fornecido.');
-      // Redireciona para cadastro após 3 segundos
       setTimeout(() => {
         setLocation(`/register?error=${encodeURIComponent('Token de validação não fornecido')}`);
-      }, 3000);
+      }, 2000);
       return;
     }
 
-    verifyEmail(token);
-  }, []);
+    if (!hasVerified) {
+      setHasVerified(true);
+      verifyEmail(token);
+    }
+  }, [hasVerified]);
 
   const verifyEmail = async (token: string) => {
     try {
@@ -38,34 +41,37 @@ export default function VerifyEmail() {
         if (result.data.already_verified) {
           setStatus('already_verified');
           setMessage(result.data.message || 'Email já foi validado anteriormente.');
-          // Redireciona para login após 2 segundos
           setTimeout(() => {
             setLocation('/login');
-          }, 2000);
+          }, 2500);
         } else {
           setStatus('success');
           setMessage(result.data.message || 'Email validado com sucesso!');
           setParticipantName(result.data.voluntary_name || '');
-          // Redireciona para login após 2 segundos
           setTimeout(() => {
             setLocation('/login');
-          }, 2000);
+          }, 2500);
         }
       } else {
         setStatus('error');
         setMessage(result.error || 'Token inválido ou expirado.');
-        // Redireciona para cadastro após 3 segundos com mensagem de erro
+        const errorMsg = result.error || '';
+        const alreadyValidated = errorMsg.includes('já validou') || errorMsg.includes('já foi validado');
+
         setTimeout(() => {
-          setLocation(`/register?error=${encodeURIComponent(result.error || 'Token inválido ou expirado')}`);
-        }, 3000);
+          if (alreadyValidated) {
+            setLocation('/login');
+          } else {
+            setLocation(`/register?error=${encodeURIComponent(result.error || 'Token inválido ou expirado')}`);
+          }
+        }, 2500);
       }
     } catch (error) {
       setStatus('error');
       setMessage('Erro ao conectar com o servidor.');
-      // Redireciona para cadastro após 3 segundos com mensagem de erro
       setTimeout(() => {
         setLocation(`/register?error=${encodeURIComponent('Erro ao conectar com o servidor')}`);
-      }, 3000);
+      }, 2500);
     }
   };
 

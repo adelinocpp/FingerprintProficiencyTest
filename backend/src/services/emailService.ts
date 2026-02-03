@@ -69,11 +69,13 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
       subject: payload.subject,
       html: payload.html,
       text: payload.text || payload.html.replace(/<[^>]*>/g, ''),
+      attachments: payload.attachments || [],
     });
 
     logger.info('Email enviado com sucesso', {
       to: payload.to,
       subject: payload.subject,
+      attachments: payload.attachments?.length || 0,
     });
   } catch (error) {
     logger.error('Erro ao enviar email', error as Error, {
@@ -292,7 +294,7 @@ export function getReminderEmailTemplate(
             <p><strong>Use qualquer um destes códigos para fazer login no sistema.</strong></p>
             
             <p style="text-align: center;">
-              <a href="${siteUrl}/login" class="button">Acessar Sistema</a>
+              <a href="${siteUrl}/login" class="button" style="color: white;" >Acessar Sistema</a>
             </p>
             
             <p><strong>Informações Importantes:</strong></p>

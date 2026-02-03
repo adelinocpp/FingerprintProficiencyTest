@@ -108,13 +108,16 @@ export function execute(
   const database = getDatabase();
   
   // Bun SQLite usa $param em vez de :param
-  // Converter parâmetros para formato correto
+  // Converter query e parâmetros para formato correto
+  let convertedQuery = query;
   const convertedParams: Record<string, any> = {};
+  
   for (const [key, value] of Object.entries(params)) {
+    convertedQuery = convertedQuery.replace(`:${key}`, `$${key}`);
     convertedParams[`$${key}`] = value;
   }
   
-  const stmt = database.query(query);
+  const stmt = database.query(convertedQuery);
   return stmt.run(convertedParams);
 }
 
@@ -127,13 +130,16 @@ export function queryOne<T>(
 ): T | undefined {
   const database = getDatabase();
   
-  // Converter parâmetros para formato $param
+  // Converter query e parâmetros para formato $param
+  let convertedQuery = query;
   const convertedParams: Record<string, any> = {};
+  
   for (const [key, value] of Object.entries(params)) {
+    convertedQuery = convertedQuery.replace(`:${key}`, `$${key}`);
     convertedParams[`$${key}`] = value;
   }
   
-  const stmt = database.query<T, Record<string, any>>(query);
+  const stmt = database.query<T, Record<string, any>>(convertedQuery);
   return stmt.get(convertedParams);
 }
 
@@ -146,13 +152,16 @@ export function queryAll<T>(
 ): T[] {
   const database = getDatabase();
   
-  // Converter parâmetros para formato $param
+  // Converter query e parâmetros para formato $param
+  let convertedQuery = query;
   const convertedParams: Record<string, any> = {};
+  
   for (const [key, value] of Object.entries(params)) {
+    convertedQuery = convertedQuery.replace(`:${key}`, `$${key}`);
     convertedParams[`$${key}`] = value;
   }
   
-  const stmt = database.query(query);
+  const stmt = database.query(convertedQuery);
   return stmt.all(convertedParams) as T[];
 }
 

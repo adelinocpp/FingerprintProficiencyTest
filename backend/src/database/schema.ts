@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS groups (
   group_index INTEGER NOT NULL,
   group_id TEXT UNIQUE NOT NULL,
   has_same_source INTEGER NOT NULL CHECK(has_same_source IN (0, 1)),
+  questionada_filename TEXT NOT NULL,
+  padroes_filenames TEXT NOT NULL,
+  matched_image_index INTEGER,
   created_at TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'completed')),
   

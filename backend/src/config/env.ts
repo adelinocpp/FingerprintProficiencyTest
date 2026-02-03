@@ -32,6 +32,11 @@ export const env = {
   IMAGE_SOURCE_PATH: process.env.IMAGE_SOURCE_PATH || './data/images',
   SAMPLES_PATH: process.env.SAMPLES_PATH || './data/samples',
 
+  // External Data Paths
+  FINGERPRINT_IMAGES_BASE: process.env.FINGERPRINT_IMAGES_BASE || '/media/DRAGONSTONE/MEGAsync/Forense/Papiloscopia/Compara_Metodos_Automaticos/Bases_de_Dados',
+  FINGERPRINT_IMAGES_DIR_0: process.env.FINGERPRINT_IMAGES_DIR_0 || 'FP_gen_0',
+  FINGERPRINT_IMAGES_DIR_1: process.env.FINGERPRINT_IMAGES_DIR_1 || 'FP_gen_1',
+
   // Image Processing
   IMAGE_WIDTH: parseInt(process.env.IMAGE_WIDTH || '712', 10),
   IMAGE_HEIGHT: parseInt(process.env.IMAGE_HEIGHT || '855', 10),
@@ -61,6 +66,15 @@ export const env = {
 
   // CSV Configuration
   PAIRWISE_COMPARISONS_FILE: process.env.PAIRWISE_COMPARISONS_FILE || './data/pairwise_comparisons_prod.csv',
+
+  // Helper functions for paths
+  getFingerprintImagesPath: (dirIndex: 0 | 1): string => {
+    const base = process.env.FINGERPRINT_IMAGES_BASE || '/media/DRAGONSTONE/MEGAsync/Forense/Papiloscopia/Compara_Metodos_Automaticos/Bases_de_Dados';
+    const dir = dirIndex === 0 
+      ? (process.env.FINGERPRINT_IMAGES_DIR_0 || 'FP_gen_0') 
+      : (process.env.FINGERPRINT_IMAGES_DIR_1 || 'FP_gen_1');
+    return `${base}/${dir}`;
+  },
 };
 
 export function validateEnv(): void {

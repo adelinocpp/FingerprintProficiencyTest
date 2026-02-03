@@ -95,6 +95,12 @@ export default function Landing() {
 
       <footer className="border-t py-8 text-center text-sm text-muted-foreground bg-white/50 backdrop-blur">
         <p>{t('app.footer')}</p>
+        <div className="mt-4 pt-4 border-t border-border/50 max-w-2xl mx-auto">
+          <p className="text-xs text-muted-foreground/80">
+            Projeto desenvolvido com apoio da <strong>FAPEMIG</strong> e <strong>Rede Mineira de Ciências Forenses</strong>
+          </p>
+          <p className="text-xs text-muted-foreground/60 font-mono mt-1">RED-00120-23</p>
+        </div>
       </footer>
     </div>
   );

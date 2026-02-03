@@ -9,6 +9,7 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import VerifyEmail from "@/pages/VerifyEmail";
 import ForgotCode from "@/pages/ForgotCode";
+import SampleEvaluation from "@/pages/SampleEvaluation";
 import NotFound from "@/pages/NotFound";
 import "@/styles/global.css";
 
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/forgot-code" component={ForgotCode} />
       <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/samples/:id/evaluate" component={SampleEvaluation} />
       <Route component={NotFound} />
     </Switch>
   );

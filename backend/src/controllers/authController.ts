@@ -547,22 +547,52 @@ export async function forgotCode(body: any): Promise<any> {
 /**
  * Valida email através do token
  */
+//TODO_VALIDAR EMAIL - Função principal de validação de email
 export async function verifyEmail(token: string): Promise<any> {
   try {
+    //TODO_VALIDAR EMAIL - Valida se token foi fornecido
     if (!token || token.trim().length === 0) {
       throw new ValidationError('Token de verificação inválido');
     }
 
-    const participant = queryOne<Participant>(
+    //TODO_VALIDAR EMAIL - Busca participante pelo token
+    let participant = queryOne<Participant>(
       'SELECT * FROM participants WHERE email_verification_token = $token',
       { token: token.trim() }
     );
 
+    //TODO_VALIDAR EMAIL - Se não encontrou, token pode estar expirado ou já validado
     if (!participant) {
-      throw new NotFoundError('Token de verificação inválido ou expirado');
+      throw new NotFoundError('Token de verificação inválido ou expirado. Se você já validou anteriormente, faça login diretamente.');
     }
 
-    // Verifica se token expirou (48 horas)
+    //TODO_VALIDAR EMAIL - Verifica se email já foi validado anteriormente
+    if (participant.email_verified === 1) {
+      // Limpa o token se ainda estiver presente
+      if (participant.email_verification_token) {
+        const now = formatDate();
+        update('participants', 
+          { 
+            email_verification_token: null,
+            token_expires_at: null,
+            updated_at: now
+          }, 
+          { id: participant.id }
+        );
+      }
+      
+      return successResponse(
+        { 
+          already_verified: true,
+          participant_id: participant.id,
+          voluntary_name: participant.voluntary_name,
+          message: 'Email já foi validado anteriormente. Você pode fazer login.' 
+        },
+        'Email já validado'
+      );
+    }
+
+    //TODO_VALIDAR EMAIL - Verifica expiração do token (48 horas)
     if (participant.token_expires_at) {
       const expiresAt = new Date(participant.token_expires_at);
       const now = new Date();
@@ -577,16 +607,7 @@ export async function verifyEmail(token: string): Promise<any> {
       }
     }
 
-    if (participant.email_verified === 1) {
-      return successResponse(
-        { 
-          already_verified: true,
-          message: 'Email já foi validado anteriormente' 
-        },
-        'Email já validado'
-      );
-    }
-
+    //TODO_VALIDAR EMAIL - Atualiza participante como verificado
     const now = formatDate();
     
     update('participants', 
@@ -604,6 +625,105 @@ export async function verifyEmail(token: string): Promise<any> {
       participant_id: participant.id,
       email: participant.voluntary_email
     });
+
+    // Cria amostra automaticamente após validação
+    try {
+      const { createSampleForParticipant } = await import('./sampleController');
+      const sampleResult = await createSampleForParticipant(participant.id, participant.carry_code);
+      
+      logger.info('Amostra criada automaticamente após validação', {
+        participant_id: participant.id,
+        carry_code: participant.carry_code
+      });
+
+      //TODO_VALIDAR EMAIL - Envia notificação por email (sem anexo)
+      if (sampleResult.success && sampleResult.data?.zip_path) {
+        logger.info('Amostra pronta para download no dashboard', {
+          participant_id: participant.id,
+          carry_code: participant.carry_code,
+          zip_path: sampleResult.data.zip_path
+        });
+        
+        // Envia email SEM anexo (apenas link para download)
+        try {
+          const { sendEmail } = await import('@/services/emailService');
+          
+          const downloadUrl = `${env.FRONTEND_URL}/dashboard`;
+          const emailContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: #2563eb; color: white; padding: 20px; text-align: center; }
+                .content { background: #f9fafb; padding: 30px; }
+                .button { display: inline-block; padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+                .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+                .info-box { background: white; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>✅ Sua Amostra Está Pronta!</h1>
+                </div>
+                <div class="content">
+                  <p>Olá, <strong>${participant.voluntary_name}</strong>!</p>
+                  
+                  <p>Sua amostra de teste foi gerada com sucesso e está disponível para download no dashboard.</p>
+                  
+                  <div class="info-box">
+                    <p><strong>📋 Informações da Amostra:</strong></p>
+                    <ul>
+                      <li><strong>Código do Participante:</strong> ${participant.voluntary_code}</li>
+                      <li><strong>Código da Amostra:</strong> ${participant.carry_code}</li>
+                      <li><strong>Total de Grupos:</strong> ${sampleResult.data.total_groups || 10}</li>
+                    </ul>
+                  </div>
+                  
+                  <p><strong>📦 Como fazer o download:</strong></p>
+                  <ol>
+                    <li>Acesse o dashboard usando o link abaixo</li>
+                    <li>Faça login com seu código: <strong>${participant.voluntary_code}</strong></li>
+                    <li>Clique no botão "Baixar Amostra (ZIP)"</li>
+                  </ol>
+                  
+                  <div style="text-align: center;">
+                    <a href="${downloadUrl}" class="button" style="color: white;">🔗 Acessar Dashboard</a>
+                  </div>
+                  
+                  <p><em>Nota: O arquivo ZIP contém todas as imagens organizadas por grupo. Tamanho aproximado: 20-30 MB.</em></p>
+                </div>
+                <div class="footer">
+                  <p>Pesquisa em Amostras de Digitais - Teste de Proficiência</p>
+                  <p>Este é um email automático, não responda.</p>
+                </div>
+              </div>
+            </body>
+            </html>
+          `;
+          
+          await sendEmail({
+            to: participant.voluntary_email,
+            subject: `[PESQUISA EM AMOSTRAS DE DIGITAIS - ${participant.carry_code}] Sua Amostra Está Pronta para Download`,
+            html: emailContent,
+          });
+
+          logger.info('Email de notificação enviado', {
+            participant_id: participant.id,
+            carry_code: participant.carry_code,
+          });
+        } catch (emailError) {
+          logger.error('Erro ao enviar email de notificação', emailError as Error);
+          // Não falha se email não for enviado
+        }
+      }
+    } catch (sampleError) {
+      logger.error('Erro ao criar/enviar amostra após validação', sampleError as Error);
+      // Não falha a validação se houver erro na criação da amostra
+    }
 
     return successResponse(
       {
