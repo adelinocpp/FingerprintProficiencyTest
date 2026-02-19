@@ -1,10 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useState, useCallback } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2 } from "lucide-react";
+import { X } from "lucide-react";
+import MagnifyingLens from "@/components/MagnifyingLens";
+import MinutiaeCanvas, { type Marking } from "@/components/MinutiaeCanvas";
 
 interface GroupViewerProps {
   group: {
@@ -17,12 +17,8 @@ interface GroupViewerProps {
     status: string;
   };
   carryCode: string;
-  onSubmit: (result: GroupResult) => void;
-  onSavePartial?: () => void;
   evaluation: any;
   onEvaluationChange: (evaluation: any) => void;
-  isLoading?: boolean;
-  allGroupsCompleted?: boolean;
 }
 
 export interface GroupResult {
@@ -34,7 +30,9 @@ export interface GroupResult {
   notes: string | null;
 }
 
-export default function GroupViewer({ group, carryCode, onSubmit, onSavePartial, evaluation, onEvaluationChange, isLoading, allGroupsCompleted = false }: GroupViewerProps) {
+export default function GroupViewer({ group, carryCode, evaluation, onEvaluationChange }: GroupViewerProps) {
+  const API_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
+
   // Estado controlado - vem do pai via props
   const conclusive = evaluation.conclusive ?? null;
   const hasMatch = evaluation.has_match ?? null;
@@ -43,255 +41,300 @@ export default function GroupViewer({ group, carryCode, onSubmit, onSavePartial,
   const notes = evaluation.notes || "";
   const selectedForComparison = evaluation.selected_for_comparison ?? null;
 
-  // Funções para atualizar estado no pai
+  // Estado local para marcações de minúcias e visibilidade
+  const [showMinutiae, setShowMinutiae] = useState(true);
+  const [questionadaMarkings, setQuestionadaMarkings] = useState<Marking[]>([]);
+  const [padraoMarkings, setPadraoMarkings] = useState<Marking[]>([]);
+
+  const handleQuestionadaMarkings = useCallback((m: Marking[]) => setQuestionadaMarkings(m), []);
+  const handlePadraoMarkings = useCallback((m: Marking[]) => setPadraoMarkings(m), []);
+
   const updateEvaluation = (updates: any) => {
     onEvaluationChange({ ...evaluation, ...updates });
   };
-  
+
   const setConclusive = (value: boolean | null) => updateEvaluation({ conclusive: value });
-  
+
   const setHasMatch = (value: boolean | null) => {
-    // Auto-seleciona a imagem clicada quando marca "Sim, identificado"
     if (value === true && selectedForComparison !== null && matchedIndex === null) {
-      updateEvaluation({ 
-        has_match: value,
-        matched_image_index: selectedForComparison 
-      });
+      updateEvaluation({ has_match: value, matched_image_index: selectedForComparison });
     } else if (value === false) {
-      // Limpa seleção quando marca "Não"
-      updateEvaluation({ 
-        has_match: value,
-        matched_image_index: null,
-        compatibility_degree: null
-      });
+      updateEvaluation({ has_match: value, matched_image_index: null, compatibility_degree: null });
     } else {
       updateEvaluation({ has_match: value });
     }
   };
-  
+
   const setMatchedIndex = (value: number | null) => updateEvaluation({ matched_image_index: value });
   const setCompatibilityDegree = (value: 1 | 2 | 3 | 4 | null) => updateEvaluation({ compatibility_degree: value });
   const setNotes = (value: string) => updateEvaluation({ notes: value });
-  const setSelectedForComparison = (value: number | null) => {
-    updateEvaluation({ selected_for_comparison: value });
-  };
+  const setSelectedForComparison = (value: number | null) => updateEvaluation({ selected_for_comparison: value });
 
-  const handleSubmit = () => {
-    if (conclusive === null) {
-      return;
-    }
+  // Funções de reset em cascata
+  const resetQ1 = () => updateEvaluation({
+    conclusive: null, has_match: null, matched_image_index: null,
+    compatibility_degree: null,
+  });
+  const resetQ2 = () => updateEvaluation({
+    has_match: null, matched_image_index: null, compatibility_degree: null,
+  });
+  const resetQ3 = () => updateEvaluation({ compatibility_degree: null });
 
-    const result: GroupResult = {
-      group_id: group.group_id,  // Código do grupo (ex: ABCD12345), não UUID
-      conclusive,
-      has_match: conclusive ? hasMatch : null,
-      matched_image_index: hasMatch ? matchedIndex : null,
-      compatibility_degree: hasMatch ? compatibilityDegree : null,
-      notes: notes.trim() || null,
-    };
-
-    console.log('Enviando resultado:', result);
-    console.log('group.group_id:', group.group_id);
-    console.log('group completo:', group);
-
-    onSubmit(result);
-  };
-
-  const canSubmit = () => {
-    if (conclusive === null) return false;
-    if (!conclusive) return true; // Inconclusivo pode submeter direto
-    if (hasMatch === null) return false;
-    if (hasMatch && matchedIndex === null) return false;
-    if (hasMatch && compatibilityDegree === null) return false;
-    return true;
-  };
-
-  const handleSavePartial = () => {
-    if (!onSavePartial) return;
-    onSavePartial();
-  };
+  const questionadaUrl = `${API_BASE_URL}/api/sample-images/${carryCode}/${group.group_id}/QUESTIONADA.jpg`;
+  const getStandardUrl = (index: number) =>
+    `${API_BASE_URL}/api/sample-images/${carryCode}/${group.group_id}/PADRAO_${String(index).padStart(2, '0')}.jpg`;
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Grupo {group.group_index + 1} - {group.group_id}</CardTitle>
-          <CardDescription>
-            Compare a imagem questionada com os padrões e indique se há correspondência
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Área de Comparação - Questionada e Padrão Selecionado */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Área de Comparação</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Imagem Questionada */}
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2 text-center">Impressão Questionada</p>
-                <div className="border-2 border-blue-500 rounded-lg p-4 bg-blue-50/30">
+    <div className="flex flex-col gap-3">
+      {/* Título do grupo */}
+      <div className="flex items-center gap-3 shrink-0">
+        <span className="text-sm font-semibold text-muted-foreground">
+          Grupo {group.group_index + 1} - {group.group_id}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          Compare a imagem questionada com os padrões e indique se há correspondência
+        </span>
+      </div>
+
+      {/* Área de imagens - 3 painéis horizontais */}
+      <div className="flex gap-3" style={{ height: 'calc(100vh - 240px)', minHeight: '500px' }}>
+        {/* Painel 1: Questionada (fixa, esquerda) */}
+        <div className="flex-1 flex flex-col border-2 border-blue-500 rounded-lg overflow-hidden min-w-0">
+          <div className="bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700 border-b shrink-0 flex items-center justify-between">
+            <span>Impressão Questionada</span>
+            <label className="flex items-center gap-1 cursor-pointer text-xs font-normal">
+              <input
+                type="checkbox"
+                checked={showMinutiae}
+                onChange={(e) => setShowMinutiae(e.target.checked)}
+                className="w-3 h-3"
+              />
+              Minúcias
+            </label>
+          </div>
+          <div className="flex-1 relative flex items-center justify-center p-2 overflow-hidden">
+            <MagnifyingLens
+              imageSrc={questionadaUrl}
+              markings={questionadaMarkings}
+              showMarkings={showMinutiae}
+            >
+              <img
+                src={questionadaUrl}
+                alt="Impressão Questionada"
+                className="max-w-full max-h-full object-contain"
+                loading="lazy"
+              />
+            </MagnifyingLens>
+            <MinutiaeCanvas
+              groupId={group.group_id}
+              imageType="questionada"
+              imageIndex={null}
+              visible={showMinutiae}
+              onMarkingsChange={handleQuestionadaMarkings}
+            />
+          </div>
+        </div>
+
+        {/* Painel 2: Padrão selecionado (centro) */}
+        <div className={`flex-1 flex flex-col border-2 rounded-lg overflow-hidden min-w-0 ${
+          selectedForComparison !== null ? 'border-green-500' : 'border-dashed border-gray-300'
+        }`}>
+          <div className={`px-3 py-1 text-sm font-medium border-b shrink-0 flex items-center justify-between ${
+            selectedForComparison !== null ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'
+          }`}>
+            <span>{selectedForComparison !== null ? `Padrão #${selectedForComparison}` : 'Selecione um padrão'}</span>
+            {selectedForComparison !== null && (
+              <label className="flex items-center gap-1 cursor-pointer text-xs font-normal">
+                <input
+                  type="checkbox"
+                  checked={showMinutiae}
+                  onChange={(e) => setShowMinutiae(e.target.checked)}
+                  className="w-3 h-3"
+                />
+                Minúcias
+              </label>
+            )}
+          </div>
+          <div className="flex-1 relative flex items-center justify-center p-2 overflow-hidden">
+            {selectedForComparison !== null ? (
+              <>
+                <MagnifyingLens
+                  imageSrc={getStandardUrl(selectedForComparison)}
+                  markings={padraoMarkings}
+                  showMarkings={showMinutiae}
+                >
                   <img
-                    src={`/api/sample-images/${carryCode}/${group.group_id}/QUESTIONADA.jpg`}
-                    alt="Impressão Questionada"
-                    className="w-full max-w-md mx-auto rounded"
+                    src={getStandardUrl(selectedForComparison)}
+                    alt={`Padrão ${selectedForComparison}`}
+                    className="max-w-full max-h-full object-contain"
                     loading="lazy"
                   />
-                </div>
-              </div>
-              
-              {/* Imagem Padrão Selecionada */}
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2 text-center">
-                  {selectedForComparison !== null ? `Impressão Padrão #${selectedForComparison}` : 'Clique em uma impressão padrão para comparar'}
-                </p>
-                <div className={`border-2 rounded-lg p-4 min-h-[300px] flex items-center justify-center ${
-                  selectedForComparison !== null 
-                    ? 'border-green-500 bg-green-50/30' 
-                    : 'border-dashed border-gray-300 bg-gray-50'
-                }`}>
-                  {selectedForComparison !== null ? (
-                    <img
-                      src={`/api/sample-images/${carryCode}/${group.group_id}/PADRAO_${String(selectedForComparison).padStart(2, '0')}.jpg`}
-                      alt={`Padrão ${selectedForComparison}`}
-                      className="w-full max-w-md mx-auto rounded"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center px-4">
-                      Selecione uma impressão padrão abaixo para visualizar lado a lado com a questionada
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+                </MagnifyingLens>
+                <MinutiaeCanvas
+                  groupId={group.group_id}
+                  imageType="padrao"
+                  imageIndex={selectedForComparison}
+                  visible={showMinutiae}
+                  onMarkingsChange={handlePadraoMarkings}
+                />
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center px-4">
+                Clique em uma miniatura ao lado para comparar
+              </p>
+            )}
           </div>
+        </div>
 
-          {/* Imagens Padrão */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Impressões Padrão</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {group.padroes_filenames.map((filename, index) => (
+        {/* Painel 3: Miniaturas (2 colunas x 5 linhas, direita) */}
+        <div className="w-56 flex flex-col border rounded-lg overflow-hidden shrink-0">
+          <div className="bg-gray-50 px-3 py-1 text-sm font-medium text-gray-700 text-center border-b shrink-0">
+            Padrões (10)
+          </div>
+          <div className="flex-1 grid grid-cols-2 gap-1 p-1.5 overflow-y-auto auto-rows-fr">
+            {group.padroes_filenames.map((_filename: string, index: number) => {
+              const isSelected = selectedForComparison === index;
+              const isMatched = matchedIndex === index;
+              return (
                 <div
                   key={index}
-                  className={`border rounded-lg p-2 cursor-pointer transition-all ${
-                    matchedIndex === index
-                      ? "ring-2 ring-primary bg-primary/10"
-                      : "hover:border-primary"
-                  }`}
                   onClick={() => {
                     setSelectedForComparison(index);
                     if (hasMatch) setMatchedIndex(index);
                   }}
+                  className={`relative border rounded cursor-pointer transition-all overflow-hidden ${
+                    isMatched ? 'ring-2 ring-primary bg-primary/10' : 'hover:border-primary'
+                  } ${isSelected ? 'border-green-500 border-2' : ''}`}
                 >
                   <img
-                    src={`/api/sample-images/${carryCode}/${group.group_id}/PADRAO_${String(index).padStart(2, '0')}.jpg`}
+                    src={getStandardUrl(index)}
                     alt={`Padrão ${index}`}
-                    className="w-full rounded"
+                    className={`w-full h-full object-cover transition-all ${
+                      isSelected ? 'blur-sm brightness-150 opacity-60' : ''
+                    }`}
                     loading="lazy"
                   />
-                  <p className="text-xs text-center mt-1 font-mono font-bold">
-                    {selectedForComparison === index && '👁️ '}
-                    Padrão #{index}
-                  </p>
+                  <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] text-center py-0.5 font-mono">
+                    #{index}
+                  </span>
                 </div>
-              ))}
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Formulário - perguntas lado a lado */}
+      <div className="border rounded-lg p-3 bg-white shrink-0">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Q1: Conclusiva? */}
+          <div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-semibold">A análise é conclusiva?</Label>
+              {conclusive !== null && (
+                <button onClick={resetQ1} className="text-red-400 hover:text-red-600 transition-colors" title="Limpar resposta">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
+            <RadioGroup
+              value={conclusive === null ? "" : conclusive.toString()}
+              onValueChange={(v) => setConclusive(v === "true")}
+              className="mt-1.5 flex gap-4"
+            >
+              <div className="flex items-center gap-1.5">
+                <RadioGroupItem value="true" id="conclusive-yes" />
+                <Label htmlFor="conclusive-yes" className="text-sm">Sim, conclusiva</Label>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <RadioGroupItem value="false" id="conclusive-no" />
+                <Label htmlFor="conclusive-no" className="text-sm">Não, inconclusiva</Label>
+              </div>
+            </RadioGroup>
           </div>
 
-          {/* Formulário de Avaliação */}
-          <div className="space-y-6 border-t pt-6">
+          {/* Q2: Correspondência? (condicional) */}
+          {conclusive && (
             <div>
-              <Label className="text-base font-semibold">A análise é conclusiva?</Label>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-semibold">Há correspondência?</Label>
+                {hasMatch !== null && (
+                  <button onClick={resetQ2} className="text-red-400 hover:text-red-600 transition-colors" title="Limpar resposta">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <RadioGroup
-                value={conclusive === null ? "" : conclusive.toString()}
-                onValueChange={(value) => setConclusive(value === "true")}
-                className="mt-2"
+                value={hasMatch === null ? "" : hasMatch.toString()}
+                onValueChange={(v) => setHasMatch(v === "true")}
+                className="mt-1.5 flex gap-4"
               >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="true" id="conclusive-yes" />
-                  <Label htmlFor="conclusive-yes">Sim, é conclusiva</Label>
+                <div className="flex items-center gap-1.5">
+                  <RadioGroupItem value="true" id="match-yes" />
+                  <Label htmlFor="match-yes" className="text-sm">Sim, identificado</Label>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="false" id="conclusive-no" />
-                  <Label htmlFor="conclusive-no">Não, é inconclusiva</Label>
+                <div className="flex items-center gap-1.5">
+                  <RadioGroupItem value="false" id="match-no" />
+                  <Label htmlFor="match-no" className="text-sm">Não, exclusão</Label>
                 </div>
               </RadioGroup>
-            </div>
-
-            {conclusive && (
-              <>
-                <div>
-                  <Label className="text-base font-semibold">Há correspondência?</Label>
-                  <RadioGroup
-                    value={hasMatch === null ? "" : hasMatch.toString()}
-                    onValueChange={(value) => setHasMatch(value === "true")}
-                    className="mt-2"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="true" id="match-yes" />
-                      <Label htmlFor="match-yes">Sim, identificado</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="false" id="match-no" />
-                      <Label htmlFor="match-no">Não, exclusão</Label>
-                    </div>
-                  </RadioGroup>
+              {/* Miniatura do padrão selecionado como match */}
+              {hasMatch && matchedIndex !== null && (
+                <div className="flex items-center gap-2 mt-2 p-1.5 bg-green-50 rounded border border-green-200">
+                  <img
+                    src={getStandardUrl(matchedIndex)}
+                    alt={`Padrão ${matchedIndex}`}
+                    className="w-10 h-10 rounded border object-cover"
+                  />
+                  <span className="text-xs text-green-700 font-medium">Padrão #{matchedIndex}</span>
                 </div>
-
-                {hasMatch && (
-                  <>
-                    <Alert>
-                      <AlertDescription>
-                        Clique na imagem padrão correspondente acima. Selecionada: {matchedIndex !== null ? `#${matchedIndex}` : "Nenhuma"}
-                      </AlertDescription>
-                    </Alert>
-
-                    <div>
-                      <Label className="text-base font-semibold">Grau de Compatibilidade</Label>
-                      <RadioGroup
-                        value={compatibilityDegree?.toString() || ""}
-                        onValueChange={(value) => setCompatibilityDegree(parseInt(value) as 1 | 2 | 3 | 4)}
-                        className="mt-2"
-                      >
-                         <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="4" id="degree-4" />
-                          <Label htmlFor="degree-4">+4 - Identificação Certa (muito fortemente compatível)</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="3" id="degree-3" />
-                          <Label htmlFor="degree-3">+3 - Identificação Certa (fortemente compatível)</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="2" id="degree-2" />
-                          <Label htmlFor="degree-2">+2 - Identificação Provável (moderadamente compatível)</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="1" id="degree-1" />
-                          <Label htmlFor="degree-1">+1 - Identificação Possível (levemente compatível)</Label>
-                        </div>
-                       
-                      </RadioGroup>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-
-            <div>
-              <Label htmlFor="notes" className="text-base font-semibold">
-                Observações (opcional)
-              </Label>
-              <Textarea
-                id="notes"
-                placeholder="Adicione observações sobre esta avaliação..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="mt-2"
-                rows={4}
-              />
+              )}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+
+          {/* Q3: Grau de compatibilidade (condicional) */}
+          {conclusive && hasMatch && (
+            <div>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-semibold">Grau de Compatibilidade</Label>
+                {compatibilityDegree !== null && (
+                  <button onClick={resetQ3} className="text-red-400 hover:text-red-600 transition-colors" title="Limpar resposta">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <RadioGroup
+                value={compatibilityDegree?.toString() || ""}
+                onValueChange={(v) => setCompatibilityDegree(parseInt(v) as 1 | 2 | 3 | 4)}
+                className="mt-1.5 flex gap-2"
+              >
+                {[4, 3, 2, 1].map(deg => (
+                  <div key={deg} className="flex items-center gap-1">
+                    <RadioGroupItem value={deg.toString()} id={`degree-${deg}`} />
+                    <Label htmlFor={`degree-${deg}`} className="text-xs">+{deg}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
+              <div className="text-[10px] text-muted-foreground mt-1">
+                Padrão selecionado: {matchedIndex !== null ? `#${matchedIndex}` : 'Nenhum (clique na miniatura)'}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Observações - full width abaixo */}
+        <div className="mt-3">
+          <Label htmlFor="notes" className="text-sm font-semibold">Observações (opcional)</Label>
+          <Textarea
+            id="notes"
+            placeholder="Adicione observações sobre esta avaliação..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="mt-1"
+            rows={2}
+          />
+        </div>
+      </div>
     </div>
   );
 }

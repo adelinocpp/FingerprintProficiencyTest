@@ -12,7 +12,8 @@
     "test": "bun test",
     "test:email": "bun src/utils/testEmail.ts",
     "lint": "eslint src --ext .ts",
-    "format": "prettier --write src"
+    "format": "prettier --write src",
+    "postinstall": "bunx puppeteer browsers install chrome"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.0.0",

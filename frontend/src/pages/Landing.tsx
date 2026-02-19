@@ -16,7 +16,7 @@ export default function Landing() {
           <div className="bg-primary text-primary-foreground p-2 rounded-xl shadow-lg shadow-primary/20">
             <Fingerprint className="w-6 h-6" />
           </div>
-          <span>{t('app.title').split(' ').slice(0, 3).join(' ')}<span className="text-primary">{t('app.title').split(' ').slice(3).join(' ')}</span></span>
+          <span>{t('app.title').split(' ').slice(0, 3).join(' ')}<span className="text-primary">  </span><span className="text-primary">{t('app.title').split(' ').slice(3).join(' ')}</span></span>
         </div>
         <div className="flex gap-4 items-center">
           {/* Language Selector */}
@@ -45,12 +45,13 @@ export default function Landing() {
       <main className="flex-1 container mx-auto px-4 flex flex-col justify-center items-center text-center relative z-10 py-20">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <ShieldCheck className="w-4 h-4" />
-          <span>{t('app.subtitle')}</span>
+          <span style={{fontSize: '0.75rem'}}>{t('app.subtitle')}</span>
         </div>
 
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-foreground max-w-4xl mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+        <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-foreground max-w-4xl mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100" style={{fontSize: '3rem'}}>
           {t('home.title')}<br/>
-          <span className="text-primary bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">
+          <span className="text-primary bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600" 
+            style={{fontSize: '2.5rem'}}>
             {t('home.subtitle')}
           </span>
         </h1>
@@ -77,17 +78,27 @@ export default function Landing() {
         <div className="grid md:grid-cols-3 gap-8 mt-24 w-full max-w-5xl text-left animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-500">
           <FeatureCard 
             title={t('home.feature1')}
-            desc={t('home.about_desc')}
+            desc={t('home.feature1_desc')}
             delay="0ms"
           />
           <FeatureCard 
             title={t('home.feature2')}
-            desc={t('home.about_desc')}
+            desc={t('home.feature2_desc')}
             delay="100ms"
           />
           <FeatureCard 
             title={t('home.feature3')}
-            desc={t('home.about_desc')}
+            desc={t('home.feature3_desc')}
+            delay="200ms"
+          />
+          <FeatureCard 
+            title={t('home.feature4')}
+            desc={t('home.feature4_desc')}
+            delay="200ms"
+          />
+          <FeatureCard 
+            title={t('home.feature5')}
+            desc={t('home.feature5_desc')}
             delay="200ms"
           />
         </div>

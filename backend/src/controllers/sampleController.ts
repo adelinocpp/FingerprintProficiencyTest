@@ -6,6 +6,46 @@ import { generateUUID, formatDate } from '@/utils/helpers';
 import { createGroupsForSample } from './groupController';
 
 /**
+ * Gera carry_code no formato 2 letras + 3 números (ex: AB123)
+ */
+function generateCarryCode(): string {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const randomLetters = Array.from({ length: 2 })
+    .map(() => letters[Math.floor(Math.random() * letters.length)])
+    .join('');
+  const randomNumbers = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0');
+  return `${randomLetters}${randomNumbers}`;
+}
+
+/**
+ * Gera um carry_code único verificando no banco de dados
+ */
+function generateUniqueCarryCode(): string {
+  let code: string;
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  do {
+    code = generateCarryCode();
+    const existing = queryOne<{ carry_code: string }>(
+      'SELECT carry_code FROM samples WHERE carry_code = $carry_code',
+      { carry_code: code }
+    );
+
+    if (!existing) {
+      return code;
+    }
+
+    attempts++;
+    if (attempts >= maxAttempts) {
+      throw new Error('Não foi possível gerar código único após múltiplas tentativas');
+    }
+  } while (true);
+}
+
+/**
  * Cria uma amostra completa para um participante (com grupos)
  */
 export async function createSampleForParticipant(participantId: string, carryCode: string): Promise<any> {
@@ -352,6 +392,55 @@ export async function getSampleProgress(
     );
   } catch (error) {
     logger.error('Erro ao obter progresso', error as Error);
+    throw error;
+  }
+}
+
+/**
+ * Solicita nova amostra para um participante
+ */
+export async function requestNewSample(params: { token: string }): Promise<any> {
+  try {
+    // Extrai participantId do token JWT
+    const { verifyToken } = await import('@/utils/security');
+    const decoded = verifyToken(params.token);
+
+    if (!decoded) {
+      throw new Error('Token inválido');
+    }
+
+    const participantId = decoded.participant_id;
+
+    // Busca dados do participante
+    const participant = queryOne<any>(
+      'SELECT * FROM participants WHERE id = $id',
+      { id: participantId }
+    );
+
+    if (!participant) {
+      throw new NotFoundError('Participante');
+    }
+
+    // Gera novo carry_code único
+    const carryCode = generateUniqueCarryCode();
+
+    logger.info('Solicitando nova amostra', {
+      participant_id: participantId,
+      carry_code: carryCode
+    });
+
+    // Cria nova amostra com grupos
+    const result = await createSampleForParticipant(participantId, carryCode);
+
+    logger.info('Nova amostra criada com sucesso', {
+      participant_id: participantId,
+      carry_code: carryCode,
+      sample_id: result.data?.sample_id
+    });
+
+    return result;
+  } catch (error) {
+    logger.error('Erro ao solicitar nova amostra', error as Error);
     throw error;
   }
 }

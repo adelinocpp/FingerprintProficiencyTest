@@ -9,6 +9,16 @@ import puppeteer from 'puppeteer';
  * Gera certificado em HTML
  */
 export function generateCertificateHTML(data: CertificateData): string {
+  // Lê a imagem da assinatura e converte para base64
+  const signaturePath = path.join(process.cwd(), 'data', 'ass_base.png');
+  let signatureBase64 = '';
+  try {
+    const signatureBuffer = fs.readFileSync(signaturePath);
+    signatureBase64 = `data:image/png;base64,${signatureBuffer.toString('base64')}`;
+  } catch (error) {
+    logger.warn('Não foi possível carregar a imagem da assinatura', error as Error);
+  }
+
   return `
     <!DOCTYPE html>
     <html>
@@ -25,7 +35,7 @@ export function generateCertificateHTML(data: CertificateData): string {
             width: 8.5in;
             height: 11in;
             margin: 20px auto;
-            padding: 60px;
+            padding: 40px;
             background: #ffffff;
             border: 8px solid #1a3a52;
             border-top: 20px solid #1a3a52;
@@ -42,87 +52,93 @@ export function generateCertificateHTML(data: CertificateData): string {
             justify-content: space-between;
           }
           .header {
-            padding-bottom: 15px;
-            margin-bottom: 25px;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
             border-bottom: 3px solid #1a3a52;
           }
           .header h1 {
-            margin: 0 0 10px 0;
+            margin: 0 0 5px 0;
             color: #1a3a52;
-            font-size: 42px;
+            font-size: 38px;
             font-weight: 700;
             letter-spacing: 4px;
             text-transform: uppercase;
           }
           .header .subtitle {
-            margin: 5px 0;
+            margin: 3px 0;
             color: #2c5f7e;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
             text-transform: uppercase;
             letter-spacing: 2px;
+          }
+          .header .certificate-id {
+            margin-top: 5px;
+            font-size: 9px;
+            color: #999999;
+            font-family: 'Courier New', monospace;
           }
           .body {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            padding: 30px 0;
+            padding: 15px 0;
           }
           .body p {
-            margin: 8px 0;
+            margin: 5px 0;
             color: #333333;
-            font-size: 14px;
-            line-height: 1.6;
+            font-size: 13px;
+            line-height: 1.5;
           }
           .project-name {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             color: #1a3a52;
-            margin: 15px 0 8px 0;
+            margin: 10px 0 5px 0;
             text-transform: uppercase;
             letter-spacing: 0.5px;
           }
           .project-stage {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 700;
             color: #2c5f7e;
-            margin: 8px 0 20px 0;
-            line-height: 1.4;
+            margin: 5px 0 15px 0;
+            line-height: 1.3;
           }
           .participant-intro {
-            font-size: 14px;
+            font-size: 13px;
             color: #555555;
-            margin: 20px 0 10px 0;
+            margin: 15px 0 8px 0;
           }
           .name {
-            font-size: 26px;
+            font-size: 24px;
             font-weight: 700;
             color: #1a3a52;
-            margin: 15px 0;
-            padding-bottom: 5px;
+            margin: 10px 0;
+            padding-bottom: 4px;
             border-bottom: 2px solid #2c5f7e;
             display: inline-block;
-            min-width: 400px;
+            min-width: 350px;
           }
           .participation-text {
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 600;
             color: #2c5f7e;
-            margin: 20px 0;
-            line-height: 1.5;
+            margin: 15px 0;
+            line-height: 1.4;
           }
           .details {
-            margin: 25px auto;
-            padding: 20px;
+            margin: 15px auto;
+            padding: 15px;
             background-color: #f8f9fa;
             border-left: 4px solid #2c5f7e;
-            max-width: 500px;
+            max-width: 450px;
             text-align: left;
           }
           .details-row {
-            margin: 8px 0;
-            font-size: 13px;
+            margin: 6px 0;
+            font-size: 12px;
             color: #333333;
             display: flex;
             justify-content: space-between;
@@ -132,15 +148,15 @@ export function generateCertificateHTML(data: CertificateData): string {
             font-weight: 600;
           }
           .acknowledgment {
-            font-size: 13px;
+            font-size: 12px;
             color: #555555;
             font-style: italic;
-            margin-top: 20px;
+            margin-top: 15px;
           }
           .footer {
             border-top: 3px solid #1a3a52;
-            padding-top: 25px;
-            margin-top: 30px;
+            padding-top: 20px;
+            margin-top: 20px;
             display: flex;
             justify-content: space-around;
             align-items: flex-end;
@@ -149,10 +165,27 @@ export function generateCertificateHTML(data: CertificateData): string {
             width: 220px;
             text-align: center;
             font-size: 12px;
+            position: relative;
+          }
+          .signature-container {
+            position: relative;
+            padding-top: 30px;
+          }
+          .signature-image {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 90px;
+            height: auto;
+            opacity: 0.9;
+            z-index: 1;
           }
           .signature-line {
+            position: relative;
+            z-index: 2;
             border-top: 2px solid #333333;
-            margin-top: 50px;
+            margin-top: 0;
             padding-top: 8px;
             font-weight: 600;
             color: #1a3a52;
@@ -163,32 +196,24 @@ export function generateCertificateHTML(data: CertificateData): string {
             color: #666666;
           }
           .funding-box {
-            margin-top: 25px;
-            padding: 15px;
+            margin-top: 15px;
+            padding: 10px;
             background-color: #f0f4f8;
             border: 1px solid #2c5f7e;
             border-radius: 4px;
-            font-size: 10px;
+            font-size: 9px;
             color: #1a3a52;
             text-align: center;
           }
           .funding-box p {
-            margin: 4px 0;
-            font-size: 10px;
+            margin: 3px 0;
+            font-size: 9px;
           }
           .funding-box .project-code {
             font-family: 'Courier New', monospace;
             font-weight: 700;
             color: #1a3a52;
             font-size: 11px;
-          }
-          .certificate-code {
-            position: absolute;
-            bottom: 15px;
-            right: 25px;
-            font-size: 9px;
-            color: #999999;
-            font-family: 'Courier New', monospace;
           }
           @media print {
             body {
@@ -208,6 +233,7 @@ export function generateCertificateHTML(data: CertificateData): string {
             <div class="header">
               <h1>CERTIFICADO</h1>
               <p class="subtitle">Participação em Pesquisa Científica</p>
+              <p class="certificate-id">Certificado ID: ${data.certificate_id}</p>
             </div>
 
             <div class="body">
@@ -249,11 +275,14 @@ export function generateCertificateHTML(data: CertificateData): string {
 
             <div class="footer">
               <div class="signature">
-                <div class="signature-line">Dr. Adelino Pinheiro Silva</div>
+                <div class="signature-container">
+                  ${signatureBase64 ? `<img src="${signatureBase64}" alt="Assinatura" class="signature-image" />` : ''}
+                  <div class="signature-line">Dr. Adelino Pinheiro Silva</div>
+                </div>
                 <p class="signature-title">Pesquisador Responsável</p>
               </div>
               <div class="signature">
-                <div class="signature-line">${new Date().toLocaleDateString('pt-BR')}</div>
+                <div class="signature-line" style="margin-top: 60px;">${new Date().toLocaleDateString('pt-BR')}</div>
                 <p class="signature-title">Data de Emissão</p>
               </div>
             </div>
@@ -263,10 +292,6 @@ export function generateCertificateHTML(data: CertificateData): string {
               <p>Este projeto é desenvolvido com apoio da <strong>FAPEMIG</strong></p>
               <p>e <strong>Rede Mineira de Ciências Forenses</strong></p>
               <p class="project-code">RED-00120-23</p>
-            </div>
-
-            <div class="certificate-code">
-              Certificado ID: ${data.certificate_id}
             </div>
           </div>
         </div>
@@ -306,11 +331,14 @@ export async function generateCertificatePDF(
   try {
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: '/usr/bin/google-chrome',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-extensions'
       ]
     });
 

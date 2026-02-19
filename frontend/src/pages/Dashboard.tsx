@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle2, Clock, ArrowRight, FileText, AlertCircle, Download, LogOut } from 'lucide-react';
+import { CheckCircle2, Clock, ArrowRight, FileText, AlertCircle, Download, LogOut, Award, Plus } from 'lucide-react';
 
 export default function Dashboard() {
   const [_, setLocation] = useLocation();
@@ -13,6 +13,7 @@ export default function Dashboard() {
   const [participant, setParticipant] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRequestingSample, setIsRequestingSample] = useState(false);
 
   useEffect(() => {
     loadSamples();
@@ -22,6 +23,40 @@ export default function Dashboard() {
     localStorage.removeItem('token');
     localStorage.removeItem('participant');
     setLocation('/login');
+  };
+
+  const handleRequestNewSample = async () => {
+    try {
+      setIsRequestingSample(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setLocation('/login');
+        return;
+      }
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_URL}/samples/request`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Recarrega lista de amostras
+        await loadSamples();
+      } else {
+        console.error('Erro ao solicitar nova amostra:', result.error);
+        alert('Erro ao solicitar nova amostra. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('Erro ao solicitar nova amostra:', error);
+      alert('Erro ao solicitar nova amostra. Tente novamente.');
+    } finally {
+      setIsRequestingSample(false);
+    }
   };
 
   const loadSamples = async () => {
@@ -43,7 +78,8 @@ export default function Dashboard() {
         }
       }
 
-      const response = await fetch('/api/samples', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_URL}/samples`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -92,8 +128,20 @@ export default function Dashboard() {
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
               {participant?.voluntary_name?.substring(0, 2).toUpperCase() || 'ME'}
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleRequestNewSample}
+              disabled={isRequestingSample}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">
+                {isRequestingSample ? 'Gerando...' : 'Nova Amostra'}
+              </span>
+            </Button>
+            <Button
+              variant="outline"
               size="sm"
               onClick={handleLogout}
               className="gap-2"
@@ -148,6 +196,38 @@ function AssignmentCard({ assignment }: { assignment: any }) {
   const groupCode = assignment.carry_code || assignment.id.substring(0, 8).toUpperCase();
   const totalGroups = assignment.groups?.length || 10;
 
+  const handleDownloadCertificate = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_URL}/certificate/download?sample_id=${assignment.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `certificado_${groupCode}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        console.error('Erro ao baixar certificado');
+        alert('Certificado não disponível para esta amostra.');
+      }
+    } catch (error) {
+      console.error('Erro ao baixar certificado:', error);
+      alert('Erro ao baixar certificado. Tente novamente.');
+    }
+  };
+
   return (
     <Card className={`group transition-all duration-300 hover:shadow-lg ${isCompleted ? 'bg-muted/30 border-muted' : 'border-primary/20 bg-white'}`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -164,21 +244,21 @@ function AssignmentCard({ assignment }: { assignment: any }) {
           </Badge>
         )}
       </CardHeader>
-      
+
       <CardContent className="pt-4">
         <CardTitle className="text-2xl font-bold font-mono mb-4 text-foreground">
           {groupCode}
         </CardTitle>
-        
+
         <div className="flex justify-between items-end">
           <div className="text-sm text-muted-foreground">
             <p>1 Impressão Questionada</p>
             <p>{totalGroups} Impressões Padrão</p>
           </div>
-          
+
           <div className="flex flex-col gap-2">
             <Link href={`/samples/${assignment.id}/evaluate`}>
-              <Button 
+              <Button
                 disabled={isCompleted}
                 className={`shadow-md transition-all ${isCompleted ? 'opacity-50' : 'hover:translate-x-1'}`}
               >
@@ -186,7 +266,7 @@ function AssignmentCard({ assignment }: { assignment: any }) {
                 {!isCompleted && <ArrowRight className="ml-2 w-4 h-4" />}
               </Button>
             </Link>
-            <Button 
+            <Button
               variant="outline"
               size="sm"
               onClick={() => window.open(`/api/samples/${assignment.id}/download`, '_blank')}
@@ -194,6 +274,16 @@ function AssignmentCard({ assignment }: { assignment: any }) {
             >
               <Download className="w-3 h-3" /> Baixar ZIP
             </Button>
+            {isCompleted && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleDownloadCertificate}
+                className="gap-1 bg-green-600 hover:bg-green-700"
+              >
+                <Award className="w-3 h-3" /> Certificado
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>

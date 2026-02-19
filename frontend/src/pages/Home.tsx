@@ -8,12 +8,12 @@ export default function Home({ navigate }: HomeProps) {
   const { t } = useI18n();
 
   return (
-    <div className="container" style={{ padding: '3rem 0' }}>
+    <div className="container" style={{ padding: '2rem 0' }}>
       <div className="text-center mb-xl">
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
+        <h3 style={{ fontSize: '1.0rem', marginBottom: '1rem' }}>
           {t('home.title') || 'Sistema de Teste de Proficiência em Impressões Digitais'}
-        </h1>
-        <p className="text-muted" style={{ fontSize: '1.2rem' }}>
+        </h3>
+        <p className="text-muted" style={{ fontSize: '1.0rem' }}>
           {t('home.subtitle') || 'Participe do estudo de comparação de impressões digitais'}
         </p>
       </div>

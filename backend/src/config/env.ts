@@ -40,10 +40,13 @@ export const env = {
   // Image Processing
   IMAGE_WIDTH: parseInt(process.env.IMAGE_WIDTH || '712', 10),
   IMAGE_HEIGHT: parseInt(process.env.IMAGE_HEIGHT || '855', 10),
-  DEGRADATION_MIN_AREA_PERCENT: parseInt(process.env.DEGRADATION_MIN_AREA_PERCENT || '10', 10),
-  DEGRADATION_MAX_AREA_PERCENT: parseInt(process.env.DEGRADATION_MAX_AREA_PERCENT || '25', 10),
-  DEGRADATION_MIN_ECCENTRICITY: parseFloat(process.env.DEGRADATION_MIN_ECCENTRICITY || '0.1'),
-  DEGRADATION_MAX_ECCENTRICITY: parseFloat(process.env.DEGRADATION_MAX_ECCENTRICITY || '0.5'),
+  //TODO_DEG - Parâmetros padrão de degradação da imagem questionada (blur elíptico)
+  DEGRADATION_MIN_AREA_PERCENT: parseInt(process.env.DEGRADATION_MIN_AREA_PERCENT || '35', 10),
+  DEGRADATION_MAX_AREA_PERCENT: parseInt(process.env.DEGRADATION_MAX_AREA_PERCENT || '70', 10),
+  DEGRADATION_MIN_ECCENTRICITY: parseFloat(process.env.DEGRADATION_MIN_ECCENTRICITY || '0.7'),
+  DEGRADATION_MAX_ECCENTRICITY: parseFloat(process.env.DEGRADATION_MAX_ECCENTRICITY || '0.95'),
+  DEGRADATION_NOISE: process.env.DEGRADATION_NOISE === 'true',
+  DEGRADATION_NOISE_INTENSITY: parseFloat(process.env.DEGRADATION_NOISE_INTENSITY || '0.5'),
 
   // Sample Generation
   HAS_SAME_SOURCE_PROBABILITY: parseFloat(process.env.HAS_SAME_SOURCE_PROBABILITY || '0.85'),

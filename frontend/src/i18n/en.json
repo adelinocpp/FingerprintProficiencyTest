@@ -1,7 +1,7 @@
 {
   "app": {
     "title": "Fingerprint Proficiency Test",
-    "subtitle": "Blind Evaluation System for Forensic Experts",
+    "subtitle": "Blind Papilloscopy Assessment System",
     "footer": "Fingerprint Proficiency Test System",
     "version": "Version 1.0.0"
   },
@@ -15,11 +15,12 @@
     "returning_desc": "Log in with your access code",
     "login": "Login",
     "about": "About the Study",
-    "about_desc": "This system allows forensic experts to participate in a blind proficiency test in fingerprint comparison. The goal is to assess the accuracy and reliability of forensic examinations.",
+    "about_desc": "This system allows professionals to participate in a blind proficiency test in fingerprint comparison. The goal is to assess the accuracy and reliability examinations.",
     "feature1": "Blind and controlled test",
     "feature2": "Multiple fingerprint samples",
     "feature3": "Participation certificate",
-    "feature4": "Contribution to scientific research"
+    "feature4": "Contribution to scientific research",
+    "feature5": "Ethics committee approval is not required"
   },
   "nav": {
     "home": "Home",

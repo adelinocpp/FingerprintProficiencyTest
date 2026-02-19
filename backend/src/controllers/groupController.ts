@@ -69,6 +69,7 @@ export async function createGroupsForSample(
         group_id: groupCode,
         has_same_source: candidate.has_same_source ? 1 : 0,
         questionada_filename: candidate.questionada,
+        questionada_quality: candidate.questionada_quality || 0,
         padroes_filenames: JSON.stringify(candidate.padroes),
         matched_image_index: candidate.matched_index,
         created_at: now,

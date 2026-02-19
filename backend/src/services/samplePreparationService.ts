@@ -72,18 +72,20 @@ export async function prepareGroupFiles(
     
     logger.info('Processando questionada', { source: questionadaSource });
     
-    //TODO_DEGRADATION_QST - Aplicar degradação elíptica na imagem questionada
-    // A degradação consiste em borrão tipo deslocamento de câmera em forma de elipse:
-    // - Excentricidade entre 0.1 e 0.5
-    // - Área entre 10% e 25% da área da elipse original (712x855 pixels)
-    // - Dentro da elipse original
-    // Implementação: await applyEllipticalBlur(questionadaSource, questionadaDest, { ... });
-    
-    // Por enquanto apenas redimensiona sem degradação
-    await sharp(questionadaSource)
+    //TODO_DEG - Aplica degradação elíptica (motion blur) na imagem questionada
+    // O script Python processa a imagem em resolução original
+    const degradedTempPath = join(groupDir, 'QUESTIONADA_degraded.png');
+    await applyEllipticalBlur(questionadaSource, degradedTempPath);
+
+    // Redimensiona a imagem degradada para 500px de largura
+    await sharp(degradedTempPath)
       .resize(500, null, { withoutEnlargement: true })
       .jpeg({ quality: 95 })
       .toFile(questionadaDest);
+
+    // Remove arquivo temporário
+    const { unlink } = await import('fs/promises');
+    await unlink(degradedTempPath).catch(() => {});
     
     // 2. Copia e renomeia imagens padrão (embaralhadas)
     const padroes = [...files.padroes];

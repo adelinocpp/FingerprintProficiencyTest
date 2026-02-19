@@ -1,4 +1,4 @@
-import { insert, queryOne, queryAll, update } from '@database/db';
+import { insert, queryOne, queryAll, update, execute } from '@database/db';
 import { validateWithZod } from '@middleware/validation';
 import { ResultSubmissionSchema } from '@utils/validators';
 import { ValidationError, NotFoundError, successResponse } from '@middleware/errorHandler';
@@ -274,13 +274,24 @@ export async function getSampleResults(
       throw new NotFoundError('Amostra');
     }
 
-    const results = queryAll<Result>(
-      'SELECT * FROM results WHERE sample_id = :sample_id ORDER BY submitted_at DESC',
+    const results = queryAll<any>(
+      `SELECT r.*, g.group_id as group_code, g.group_index
+       FROM results r
+       JOIN groups g ON r.group_id = g.id
+       WHERE r.sample_id = :sample_id
+       ORDER BY g.group_index ASC`,
       { sample_id: sampleId }
     );
 
+    // Converte integers do SQLite para booleans
+    const enrichedResults = results.map((r: any) => ({
+      ...r,
+      conclusive: r.conclusive === 1,
+      has_match: r.has_match === null ? null : r.has_match === 1,
+    }));
+
     return successResponse(
-      { sample, results },
+      { sample, results: enrichedResults },
       'Resultados obtidos com sucesso'
     );
   } catch (error) {
@@ -312,6 +323,137 @@ export async function getGroupResult(
     return successResponse(result, 'Resultado obtido com sucesso');
   } catch (error) {
     logger.error('Erro ao obter resultado do grupo', error as Error);
+    throw error;
+  }
+}
+
+/**
+ * Obtém marcações de minúcias de uma imagem específica
+ */
+export async function getMinutiaeMarkings(
+  participantId: string,
+  groupId: string,
+  imageType: string,
+  imageIndex: number | null
+): Promise<any> {
+  try {
+    const group = queryOne<Group>(
+      'SELECT * FROM groups WHERE group_id = :group_id',
+      { group_id: groupId }
+    );
+    if (!group) {
+      throw new NotFoundError('Grupo');
+    }
+
+    let markings;
+    if (imageIndex !== null) {
+      markings = queryAll<any>(
+        `SELECT id, x, y, image_type, image_index, created_at
+         FROM minutiae_markings
+         WHERE participant_id = :participant_id AND group_id = :group_id
+           AND image_type = :image_type AND image_index = :image_index
+         ORDER BY created_at ASC`,
+        { participant_id: participantId, group_id: group.id, image_type: imageType, image_index: imageIndex }
+      );
+    } else {
+      markings = queryAll<any>(
+        `SELECT id, x, y, image_type, image_index, created_at
+         FROM minutiae_markings
+         WHERE participant_id = :participant_id AND group_id = :group_id
+           AND image_type = :image_type AND image_index IS NULL
+         ORDER BY created_at ASC`,
+        { participant_id: participantId, group_id: group.id, image_type: imageType }
+      );
+    }
+
+    return successResponse({ markings }, 'Marcações obtidas');
+  } catch (error) {
+    logger.error('Erro ao buscar minúcias', error as Error);
+    throw error;
+  }
+}
+
+/**
+ * Adiciona uma marcação de minúcia
+ */
+export async function addMinutiaeMarking(
+  participantId: string,
+  body: any
+): Promise<any> {
+  try {
+    const { group_id, image_type, image_index, x, y } = body;
+
+    if (!group_id || !image_type || x === undefined || y === undefined) {
+      throw new ValidationError('Campos obrigatórios: group_id, image_type, x, y');
+    }
+    if (image_type !== 'questionada' && image_type !== 'padrao') {
+      throw new ValidationError('image_type deve ser "questionada" ou "padrao"');
+    }
+    if (x < 0 || x > 1 || y < 0 || y > 1) {
+      throw new ValidationError('Coordenadas x e y devem estar entre 0.0 e 1.0');
+    }
+
+    const group = queryOne<Group>(
+      'SELECT * FROM groups WHERE group_id = :group_id',
+      { group_id }
+    );
+    if (!group) {
+      throw new NotFoundError('Grupo');
+    }
+
+    const sample = queryOne<Sample>(
+      'SELECT * FROM samples WHERE id = :id AND participant_id = :participant_id',
+      { id: group.sample_id, participant_id: participantId }
+    );
+    if (!sample) {
+      throw new ValidationError('Sem permissão para acessar este grupo');
+    }
+
+    const markingId = generateUUID();
+    const now = formatDate();
+
+    insert('minutiae_markings', {
+      id: markingId,
+      result_id: null,
+      group_id: group.id,
+      sample_id: group.sample_id,
+      participant_id: participantId,
+      image_type,
+      image_index: image_index ?? null,
+      x,
+      y,
+      created_at: now,
+    });
+
+    return successResponse({ id: markingId, x, y, image_type, image_index, created_at: now }, 'Marcação adicionada');
+  } catch (error) {
+    logger.error('Erro ao adicionar minúcia', error as Error);
+    throw error;
+  }
+}
+
+/**
+ * Remove uma marcação de minúcia
+ */
+export async function removeMinutiaeMarking(
+  participantId: string,
+  markingId: string
+): Promise<any> {
+  try {
+    const marking = queryOne<any>(
+      'SELECT * FROM minutiae_markings WHERE id = :id AND participant_id = :participant_id',
+      { id: markingId, participant_id: participantId }
+    );
+
+    if (!marking) {
+      throw new NotFoundError('Marcação');
+    }
+
+    execute('DELETE FROM minutiae_markings WHERE id = :id', { id: markingId });
+
+    return successResponse({ id: markingId }, 'Marcação removida');
+  } catch (error) {
+    logger.error('Erro ao remover minúcia', error as Error);
     throw error;
   }
 }

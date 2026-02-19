@@ -1,7 +1,7 @@
 {
   "app": {
     "title": "Prueba de Competencia en Huellas Dactilares",
-    "subtitle": "Sistema de Evaluación Ciega para Peritos Forenses",
+    "subtitle": "Sistema de evaluación de papiloscopia ciega",
     "footer": "Sistema de Prueba de Competencia en Huellas Dactilares",
     "version": "Versión 1.0.0"
   },
@@ -15,11 +15,12 @@
     "returning_desc": "Inicie sesión con su código de acceso",
     "login": "Entrar",
     "about": "Sobre el Estudio",
-    "about_desc": "Este sistema permite que peritos forenses participen en una prueba ciega de competencia en comparación de huellas dactilares. El objetivo es evaluar la precisión y confiabilidad de los exámenes periciales.",
+    "about_desc": "Este sistema permite que profesionales participen en una prueba ciega de competencia en comparación de huellas dactilares. El objetivo es evaluar la precisión y confiabilidad de los exámenes.",
     "feature1": "Prueba ciega y controlada",
     "feature2": "Múltiples muestras de huellas dactilares",
     "feature3": "Certificado de participación",
-    "feature4": "Contribución a la investigación científica"
+    "feature4": "Contribución a la investigación científica",
+    "feature5": "No se requiere la aprobación del comité de ética"
   },
   "nav": {
     "home": "Inicio",

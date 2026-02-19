@@ -1,7 +1,7 @@
 {
   "app": {
     "title": "Teste de Proficiência em Impressões Digitais",
-    "subtitle": "Sistema de Avaliação Cega para Peritos Criminais",
+    "subtitle": "Sistema de Avaliação Cega em Papiloscopia",
     "footer": "Sistema de Teste de Proficiência em Impressões Digitais",
     "version": "Versão 1.0.0"
   },
@@ -13,8 +13,8 @@
     "logout": "Sair"
   },
   "home": {
-    "title": "Teste de Proficiência em Impressões Digitais",
-    "subtitle": "Participe do estudo de comparação de impressões digitais",
+    "title": "Estudo de Proficiência em Papiloscopia",
+    "subtitle": "Participe comparando impressões digitais",
     "new_participant": "Novo Participante",
     "new_participant_desc": "Cadastre-se para participar do teste de proficiência",
     "register": "Cadastrar",
@@ -22,11 +22,17 @@
     "returning_desc": "Faça login com seu código de acesso",
     "login": "Entrar",
     "about": "Sobre o Estudo",
-    "about_desc": "Este sistema permite que peritos criminais participem de um teste cego de proficiência em comparação de impressões digitais. O objetivo é avaliar a acurácia e confiabilidade dos exames periciais.",
+    "about_desc": "Este sistema permite que profissionais participem de um teste cego de proficiência em comparação de impressões digitais. O objetivo é avaliar a acurácia e confiabilidade dos exames.",
     "feature1": "Teste cego e controlado",
     "feature2": "Múltiplas amostras de impressões digitais",
     "feature3": "Certificado de participação",
-    "feature4": "Contribuição para pesquisa científica"
+    "feature4": "Contribuição para pesquisa científica",
+    "feature5": "Dispensa aprovação de comitê de ética",
+    "feature1_desc": "Participantes anonimizados, e amostras únicas ramdomizadas, ",
+    "feature2_desc": "Múltiplas amostras de impressões digitais",
+    "feature3_desc": "A contribuição de cada voluntário e muito importante. Por isso o sistema emite ao participante, cada amostra analisada, um certificado único e personalizado.",
+    "feature4_desc": "Contribua para o desenvolvimento da papiloscopia como ciência forense no estabelecimento de índices de acurácia em testes controlados",
+    "feature5_desc": "Trata-se de pesquisa anonimizada com objetivo de aprofundamento teórico de situações que emergem espontânea e contingencialmente da prática profissional. Vide inciso VII, parágrafo úníco do Art. 1° da Resolução n° 510 do CNS."
   },
   "common": {
     "cancel": "Cancelar",

@@ -55,11 +55,12 @@ CREATE TABLE IF NOT EXISTS groups (
   group_id TEXT UNIQUE NOT NULL,
   has_same_source INTEGER NOT NULL CHECK(has_same_source IN (0, 1)),
   questionada_filename TEXT NOT NULL,
+  questionada_quality INTEGER DEFAULT 0,
   padroes_filenames TEXT NOT NULL,
   matched_image_index INTEGER,
   created_at TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'completed')),
-  
+
   FOREIGN KEY (sample_id) REFERENCES samples(id) ON DELETE CASCADE
 );
 
@@ -217,6 +218,28 @@ CREATE TABLE IF NOT EXISTS pairwise_cache (
 CREATE INDEX IF NOT EXISTS idx_pairwise_arquivo_a ON pairwise_cache(arquivo_a);
 CREATE INDEX IF NOT EXISTS idx_pairwise_arquivo_b ON pairwise_cache(arquivo_b);
 CREATE INDEX IF NOT EXISTS idx_pairwise_mesma_fonte ON pairwise_cache(mesma_fonte);
+
+-- Tabela de marcações de minúcias
+CREATE TABLE IF NOT EXISTS minutiae_markings (
+  id TEXT PRIMARY KEY,
+  result_id TEXT,
+  group_id TEXT NOT NULL,
+  sample_id TEXT NOT NULL,
+  participant_id TEXT NOT NULL,
+  image_type TEXT NOT NULL CHECK(image_type IN ('questionada', 'padrao')),
+  image_index INTEGER,
+  x REAL NOT NULL,
+  y REAL NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  FOREIGN KEY (sample_id) REFERENCES samples(id) ON DELETE CASCADE,
+  FOREIGN KEY (participant_id) REFERENCES participants(id) ON DELETE CASCADE
+);
+
+-- Índices para minúcias
+CREATE INDEX IF NOT EXISTS idx_minutiae_group_id ON minutiae_markings(group_id);
+CREATE INDEX IF NOT EXISTS idx_minutiae_participant_id ON minutiae_markings(participant_id);
+CREATE INDEX IF NOT EXISTS idx_minutiae_sample_id ON minutiae_markings(sample_id);
 `;
 
 /**

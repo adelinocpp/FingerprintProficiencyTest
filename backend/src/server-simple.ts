@@ -21,7 +21,7 @@ async function startServer() {
     // Cria aplicação Elysia
     const app = new Elysia()
       .use(cors({
-        origin: env.FRONTEND_URL || 'http://localhost:5173',
+        origin: true, // Aceita qualquer origem em desenvolvimento
         credentials: true
       }))
       .onError(({ code, error, set }) => {
@@ -131,6 +131,23 @@ async function startServer() {
         const token = authHeader.replace('Bearer ', '');
         return await sampleController.getSampleProgress({ token, sample_id: params.id });
       })
+      .post('/api/samples/request', async ({ headers }: any) => {
+        try {
+          const authHeader = headers['authorization'];
+          if (!authHeader) {
+            return { success: false, error: 'Não autorizado' };
+          }
+          const token = authHeader.replace('Bearer ', '');
+          return await sampleController.requestNewSample({ token });
+        } catch (error: any) {
+          logger.error('Erro ao solicitar nova amostra', error);
+          return {
+            success: false,
+            error: error.message || 'Erro ao solicitar nova amostra',
+            code: error.code || 'REQUEST_SAMPLE_ERROR'
+          };
+        }
+      })
       // Rotas de grupos
       .post('/api/samples/:id/groups', async ({ params }: any) => {
         return await groupController.createGroupsForSample(params.id);
@@ -179,19 +196,140 @@ async function startServer() {
           return { success: false, error: 'Não autorizado' };
         }
         const token = authHeader.replace('Bearer ', '');
-        
+
         // Extrai participantId do token
         const { verifyToken } = await import('@/utils/security');
         const payload = verifyToken(token);
         if (!payload || !payload.participant_id) {
           return { success: false, error: 'Token inválido' };
         }
-        
+
         return await resultController.submitGroupResult(payload.participant_id, body);
       })
-      .listen(env.PORT || 3000);
+      .get('/api/results/sample/:sampleId', async ({ params, headers }: any) => {
+        const authHeader = headers['authorization'];
+        if (!authHeader) {
+          return { success: false, error: 'Não autorizado' };
+        }
+        const token = authHeader.replace('Bearer ', '');
+        const { verifyToken } = await import('@/utils/security');
+        const payload = verifyToken(token);
+        if (!payload || !payload.participant_id) {
+          return { success: false, error: 'Token inválido' };
+        }
+        return await resultController.getSampleResults(payload.participant_id, params.sampleId);
+      })
+      // Rotas de minúcias
+      .get('/api/minutiae/:groupId/:imageType/:imageIndex', async ({ params, headers }: any) => {
+        const authHeader = headers['authorization'];
+        if (!authHeader) {
+          return { success: false, error: 'Não autorizado' };
+        }
+        const token = authHeader.replace('Bearer ', '');
+        const { verifyToken } = await import('@/utils/security');
+        const payload = verifyToken(token);
+        if (!payload || !payload.participant_id) {
+          return { success: false, error: 'Token inválido' };
+        }
+        const imageIndex = params.imageIndex === 'null' ? null : parseInt(params.imageIndex);
+        return await resultController.getMinutiaeMarkings(
+          payload.participant_id, params.groupId, params.imageType, imageIndex
+        );
+      })
+      .post('/api/minutiae', async ({ body, headers }: any) => {
+        const authHeader = headers['authorization'];
+        if (!authHeader) {
+          return { success: false, error: 'Não autorizado' };
+        }
+        const token = authHeader.replace('Bearer ', '');
+        const { verifyToken } = await import('@/utils/security');
+        const payload = verifyToken(token);
+        if (!payload || !payload.participant_id) {
+          return { success: false, error: 'Token inválido' };
+        }
+        return await resultController.addMinutiaeMarking(payload.participant_id, body);
+      })
+      .delete('/api/minutiae/:id', async ({ params, headers }: any) => {
+        const authHeader = headers['authorization'];
+        if (!authHeader) {
+          return { success: false, error: 'Não autorizado' };
+        }
+        const token = authHeader.replace('Bearer ', '');
+        const { verifyToken } = await import('@/utils/security');
+        const payload = verifyToken(token);
+        if (!payload || !payload.participant_id) {
+          return { success: false, error: 'Token inválido' };
+        }
+        return await resultController.removeMinutiaeMarking(payload.participant_id, params.id);
+      })
+      // Rota de download do certificado
+      .get('/api/certificate/download', async ({ headers, query, set }: any) => {
+        try {
+          const authHeader = headers['authorization'];
+          if (!authHeader) {
+            set.status = 401;
+            return { success: false, error: 'Não autorizado' };
+          }
+          const token = authHeader.replace('Bearer ', '');
 
-    logger.info(`Servidor rodando em http://localhost:${env.PORT || 3000}`);
+          // Extrai participantId do token
+          const { verifyToken } = await import('@/utils/security');
+          const payload = verifyToken(token);
+          if (!payload || !payload.participant_id) {
+            set.status = 401;
+            return { success: false, error: 'Token inválido' };
+          }
+
+          // Pega sample_id da query (opcional)
+          const sampleId = query?.sample_id;
+
+          // Busca certificado do participante
+          const { queryOne } = await import('./database/db');
+
+          let certificate;
+          if (sampleId) {
+            // Busca certificado específico da amostra
+            certificate = queryOne<any>(
+              'SELECT * FROM certificates WHERE participant_id = $participant_id AND sample_id = $sample_id ORDER BY issued_at DESC LIMIT 1',
+              { participant_id: payload.participant_id, sample_id: sampleId }
+            );
+          } else {
+            // Busca certificado mais recente
+            certificate = queryOne<any>(
+              'SELECT * FROM certificates WHERE participant_id = $participant_id ORDER BY issued_at DESC LIMIT 1',
+              { participant_id: payload.participant_id }
+            );
+          }
+
+          if (!certificate || !certificate.file_path) {
+            set.status = 404;
+            return { success: false, error: 'Certificado não encontrado' };
+          }
+
+          // Busca dados da amostra para o nome do arquivo
+          const sample = queryOne<any>(
+            'SELECT carry_code FROM samples WHERE id = $id',
+            { id: certificate.sample_id }
+          );
+
+          const fileName = `certificado_${sample?.carry_code || 'participante'}.pdf`;
+
+          set.headers['Content-Type'] = 'application/pdf';
+          set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
+
+          return Bun.file(certificate.file_path);
+        } catch (error: any) {
+          logger.error('Erro ao baixar certificado', error);
+          set.status = 500;
+          return { success: false, error: error.message || 'Erro ao baixar certificado' };
+        }
+      })
+      .listen({
+        hostname: '0.0.0.0',
+        port: env.PORT || 3000
+      });
+
+    logger.info(`Servidor rodando em http://0.0.0.0:${env.PORT || 3000}`);
 
     // Graceful shutdown
     process.on('SIGINT', () => {

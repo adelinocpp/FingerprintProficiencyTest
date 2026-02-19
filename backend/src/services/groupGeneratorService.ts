@@ -7,6 +7,7 @@ import type { PairwiseComparison } from '@/types';
 
 interface GroupCandidate {
   questionada: string;
+  questionada_quality: number;
   padroes: string[];
   has_same_source: boolean;
   matched_index: number | null;
@@ -230,8 +231,20 @@ export async function generateGroup(
       return null;
     }
 
+    // Extrai qualidade da imagem questionada
+    const questionadaQuality = comparisons.find(
+      (comp) => comp.arquivo_a === questionada || comp.arquivo_b === questionada
+    );
+
+    const quality = questionadaQuality
+      ? (questionadaQuality.arquivo_a === questionada
+          ? questionadaQuality.quali_a
+          : questionadaQuality.quali_b)
+      : 0;
+
     return {
       questionada,
+      questionada_quality: quality,
       padroes,
       has_same_source: hasSameSource,
       matched_index: matchedIndex,
