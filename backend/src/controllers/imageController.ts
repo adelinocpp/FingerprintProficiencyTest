@@ -1,22 +1,49 @@
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { env } from '@/config/env';
-import { logger } from '@middleware/logger';
+import { logger, logSecurityEvent } from '@middleware/logger';
 import { errorResponse } from '@middleware/errorHandler';
+
+/**
+ * Valida componente de path para prevenir path traversal
+ * Rejeita '..', '/', '\' e caracteres de controle
+ */
+function isSafePathComponent(component: string): boolean {
+  if (!component || component.length === 0 || component.length > 255) return false;
+  if (component.includes('..') || component.includes('/') || component.includes('\\')) return false;
+  if (component.includes('\0') || component.includes('\n') || component.includes('\r')) return false;
+  return true;
+}
+
+/**
+ * Verifica se o path resolvido está dentro do diretório permitido
+ */
+function isWithinDirectory(filePath: string, allowedDir: string): boolean {
+  const resolvedPath = resolve(filePath);
+  const resolvedDir = resolve(allowedDir);
+  return resolvedPath.startsWith(resolvedDir + '/');
+}
 
 /**
  * Obtém caminho completo de uma imagem
  */
 function getImagePath(filename: string): string | null {
+  if (!isSafePathComponent(filename)) {
+    logSecurityEvent('PATH_TRAVERSAL', null, null, { filename, context: 'getImagePath' });
+    return null;
+  }
+
   // Primeiro tenta em FP_gen_0
-  const path0 = join(env.getFingerprintImagesPath(0), filename);
-  if (existsSync(path0)) {
+  const dir0 = env.getFingerprintImagesPath(0);
+  const path0 = join(dir0, filename);
+  if (isWithinDirectory(path0, dir0) && existsSync(path0)) {
     return path0;
   }
 
   // Depois tenta em FP_gen_1
-  const path1 = join(env.getFingerprintImagesPath(1), filename);
-  if (existsSync(path1)) {
+  const dir1 = env.getFingerprintImagesPath(1);
+  const path1 = join(dir1, filename);
+  if (isWithinDirectory(path1, dir1) && existsSync(path1)) {
     return path1;
   }
 
@@ -71,44 +98,44 @@ export async function checkImageExists(filename: string): Promise<any> {
  * Converte automaticamente nomes .png para .jpg
  */
 export async function serveSampleImage(
-  carryCode: string, 
-  groupId: string, 
+  carryCode: string,
+  groupId: string,
   filename: string
 ): Promise<any> {
   try {
+    // Valida todos os componentes do path contra traversal
+    if (!isSafePathComponent(carryCode) || !isSafePathComponent(groupId) || !isSafePathComponent(filename)) {
+      logSecurityEvent('PATH_TRAVERSAL', null, null, { carryCode, groupId, filename, context: 'serveSampleImage' });
+      return errorResponse('Parâmetros inválidos', 'BAD_REQUEST');
+    }
+
+    const samplesDir = resolve(env.SAMPLES_PATH);
+
     // Converte nome do arquivo: .png original -> nome processado .jpg
     let processedFilename = filename;
-    
+
     if (filename.includes('_v') && filename.endsWith('.png')) {
       // É uma imagem original (ex: fingerprint_7519_v04.png)
-      // Determina se é questionada ou padrão pelo contexto
-      // Por enquanto, busca por QUESTIONADA.jpg ou PADRAO_XX.jpg
-      
-      // Tenta primeiro como QUESTIONADA
       const questionadaPath = join(env.SAMPLES_PATH, carryCode, groupId, 'QUESTIONADA.jpg');
-      if (existsSync(questionadaPath)) {
+      if (isWithinDirectory(questionadaPath, samplesDir) && existsSync(questionadaPath)) {
         return {
           success: true,
           path: questionadaPath,
           filename: 'QUESTIONADA.jpg',
         };
       }
-      
-      // Se não é questionada, pode ser um dos padrões - precisa encontrar qual
-      // Lista todos os padrões e retorna o primeiro disponível (isso é temporário)
+
       for (let i = 0; i < 20; i++) {
         const padraoPath = join(env.SAMPLES_PATH, carryCode, groupId, `PADRAO_${String(i).padStart(2, '0')}.jpg`);
-        if (existsSync(padraoPath)) {
-          // Por enquanto retorna o path do padrão (precisaria de mapeamento melhor)
-          // Vamos criar uma abordagem diferente
+        if (isWithinDirectory(padraoPath, samplesDir) && existsSync(padraoPath)) {
           break;
         }
       }
     }
-    
+
     // Tenta caminho direto (nome já processado)
     const directPath = join(env.SAMPLES_PATH, carryCode, groupId, processedFilename);
-    if (existsSync(directPath)) {
+    if (isWithinDirectory(directPath, samplesDir) && existsSync(directPath)) {
       return {
         success: true,
         path: directPath,
@@ -116,13 +143,13 @@ export async function serveSampleImage(
       };
     }
 
-    logger.warn('Imagem processada não encontrada', { 
-      carryCode, 
-      groupId, 
+    logger.warn('Imagem processada não encontrada', {
+      carryCode,
+      groupId,
       filename,
-      processedFilename 
+      processedFilename
     });
-    
+
     return errorResponse('Imagem não encontrada', 'NOT_FOUND');
   } catch (error) {
     logger.error('Erro ao servir imagem da amostra', error as Error);

@@ -1,14 +1,15 @@
 import { generateUniqueVoluntaryCode, generateUniqueCarryCode } from '@services/codeGenerator';
 import { sendEmail, getWelcomeEmailTemplate, getReminderEmailTemplate } from '@services/emailService';
-import { sanitizeString, isValidEmail, isValidName, generateToken, generateSHA256 } from '@utils/security';
+import { sanitizeString, isValidEmail, isValidName, generateToken, generateSHA256, generateRefreshToken } from '@utils/security';
 import { generateUUID, formatDate } from '@utils/helpers';
-import { insert, queryOne, update, queryAll } from '@database/db';
+import { insert, queryOne, update, queryAll, execute } from '@database/db';
 import { validateWithZod } from '@middleware/validation';
 import { RegisterSchema, LoginSchema } from '@utils/validators';
 import { ValidationError, AuthenticationError, ConflictError, NotFoundError, successResponse, errorResponse } from '@middleware/errorHandler';
+import { recordAccountFailure, clearAccountFailures, isAccountLocked } from '@middleware/auth';
 import { Participant, LoginResponse, Sample } from '../types/index';
 import { env } from '@config/env';
-import { logger } from '@middleware/logger';
+import { logger, logSecurityEvent } from '@middleware/logger';
 
 /**
  * Registra novo participante
@@ -58,17 +59,18 @@ export async function registerParticipant(body: any): Promise<any> {
           const now = formatDate();
           // Token expira em 48 horas
           const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-          
-          // Atualiza token no banco
-          update('participants', 
-            { 
-              email_verification_token: new_verification_token,
+
+          // Armazena hash do token no banco (segurança)
+          update('participants',
+            {
+              email_verification_token: generateSHA256(new_verification_token),
               token_expires_at: expiresAt,
               updated_at: now
-            }, 
+            },
             { id: existingParticipant.id }
           );
 
+          // Envia token em texto plano no email
           const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${new_verification_token}`;
           
           emailContent = getWelcomeEmailTemplate(
@@ -135,15 +137,15 @@ export async function registerParticipant(body: any): Promise<any> {
     // Token expira em 48 horas
     const token_expires_at = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
-    // Prepara dados para inserção
+    // Prepara dados para inserção (armazena hash do token)
     const insertData = {
       id: participant_id,
       voluntary_email: voluntary_email.toLowerCase().trim(),
       voluntary_code,
-      voluntary_name: voluntary_name.trim(),
+      voluntary_name: sanitizeString(voluntary_name.trim()),
       carry_code,
       email_verified: 0,
-      email_verification_token,
+      email_verification_token: generateSHA256(email_verification_token),
       token_expires_at,
       email_verified_at: null,
       created_at: now,
@@ -219,6 +221,12 @@ export async function loginParticipant(body: any): Promise<any> {
     const { code } = validation.data;
     const upperCode = code.toUpperCase();
 
+    // Verifica lockout por conta (M - proteção contra brute force)
+    if (isAccountLocked(upperCode)) {
+      logSecurityEvent('ACCOUNT_LOCKED', null, null, { code: upperCode });
+      throw new AuthenticationError('Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em 30 minutos.');
+    }
+
     // Busca participante por VOLUNTARY_CODE ou CARRY_CODE
     let participant = queryOne<Participant>(
       'SELECT * FROM participants WHERE voluntary_code = $code OR carry_code = $code',
@@ -226,6 +234,8 @@ export async function loginParticipant(body: any): Promise<any> {
     );
 
     if (!participant) {
+      recordAccountFailure(upperCode);
+      logSecurityEvent('AUTH_FAILURE', null, null, { code: upperCode, reason: 'code_not_found' });
       throw new AuthenticationError('Código inválido');
     }
 
@@ -235,18 +245,20 @@ export async function loginParticipant(body: any): Promise<any> {
 
     // Verifica se email foi validado
     if (participant.email_verified === 0) {
+      logSecurityEvent('AUTH_UNVERIFIED', null, participant.id, { code: upperCode });
       // Reenvia email de validação
       try {
         const new_verification_token = generateUUID();
         const now = formatDate();
         const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-        
-        update('participants', 
-          { 
-            email_verification_token: new_verification_token,
+
+        // Armazena hash do token no banco (segurança)
+        update('participants',
+          {
+            email_verification_token: generateSHA256(new_verification_token),
             token_expires_at: expiresAt,
             updated_at: now
-          }, 
+          },
           { id: participant.id }
         );
 
@@ -279,14 +291,45 @@ export async function loginParticipant(body: any): Promise<any> {
       throw new AuthenticationError('Você precisa validar seu email antes de fazer login. Reenviamos o email de validação para você.');
     }
 
+    // Login bem-sucedido - limpa contador de falhas
+    clearAccountFailures(upperCode);
+
     // Atualiza último acesso
     const now = formatDate();
     update('participants', { last_access: now, updated_at: now }, { id: participant.id });
 
-    // Gera token
+    // Gera access token (curta duração, definido em JWT_EXPIRATION)
     const token = generateToken({
       participant_id: participant.id,
       voluntary_code: participant.voluntary_code,
+    });
+
+    // Gera refresh token (longa duração, armazenado no DB)
+    const refreshTokenPlain = generateRefreshToken();
+    const refreshTokenHash = generateSHA256(refreshTokenPlain);
+    const refreshExpiresAt = new Date(
+      Date.now() + env.REFRESH_TOKEN_EXPIRATION_DAYS * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    // Remove refresh tokens antigos deste participante (máximo 5 sessões ativas)
+    const existingTokens = queryAll<{ id: string }>(
+      'SELECT id FROM refresh_tokens WHERE participant_id = $participant_id ORDER BY created_at ASC',
+      { participant_id: participant.id }
+    );
+    if (existingTokens.length >= 5) {
+      const toDelete = existingTokens.slice(0, existingTokens.length - 4);
+      for (const t of toDelete) {
+        execute('DELETE FROM refresh_tokens WHERE id = :id', { id: t.id });
+      }
+    }
+
+    // Armazena hash do refresh token
+    insert('refresh_tokens', {
+      id: generateUUID(),
+      participant_id: participant.id,
+      token_hash: refreshTokenHash,
+      expires_at: refreshExpiresAt,
+      created_at: now,
     });
 
     // Busca amostras do participante
@@ -300,9 +343,10 @@ export async function loginParticipant(body: any): Promise<any> {
       voluntary_code: participant.voluntary_code,
     });
 
-    return successResponse<LoginResponse>(
+    return successResponse(
       {
         token,
+        refresh_token: refreshTokenPlain,
         participant,
         samples,
       },
@@ -359,7 +403,7 @@ export async function updateParticipant(
       if (!isValidName(body.voluntary_name)) {
         throw new ValidationError('Nome inválido');
       }
-      updates.voluntary_name = body.voluntary_name.trim();
+      updates.voluntary_name = sanitizeString(body.voluntary_name.trim());
     }
 
     if (Object.keys(updates).length === 0) {
@@ -476,19 +520,20 @@ export async function forgotCode(body: any): Promise<any> {
         const new_verification_token = generateUUID();
         const now = formatDate();
         const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-        
-        // Atualiza token no banco
-        update('participants', 
-          { 
-            email_verification_token: new_verification_token,
+
+        // Armazena hash do token no banco (segurança)
+        update('participants',
+          {
+            email_verification_token: generateSHA256(new_verification_token),
             token_expires_at: expiresAt,
             updated_at: now
-          }, 
+          },
           { id: participant.id }
         );
 
+        // Envia token em texto plano no email
         const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${new_verification_token}`;
-        
+
         emailContent = getWelcomeEmailTemplate(
           participant.voluntary_name,
           participant.voluntary_code,
@@ -555,10 +600,11 @@ export async function verifyEmail(token: string): Promise<any> {
       throw new ValidationError('Token de verificação inválido');
     }
 
-    //TODO_VALIDAR EMAIL - Busca participante pelo token
+    //TODO_VALIDAR EMAIL - Busca participante pelo hash do token
+    const tokenHash = generateSHA256(token.trim());
     let participant = queryOne<Participant>(
       'SELECT * FROM participants WHERE email_verification_token = $token',
-      { token: token.trim() }
+      { token: tokenHash }
     );
 
     //TODO_VALIDAR EMAIL - Se não encontrou, token pode estar expirado ou já validado
@@ -736,6 +782,191 @@ export async function verifyEmail(token: string): Promise<any> {
     );
   } catch (error) {
     logger.error('Erro ao validar email', error as Error);
+    throw error;
+  }
+}
+
+/**
+ * Renova access token usando refresh token
+ */
+export async function refreshAccessToken(body: any): Promise<any> {
+  try {
+    const { refresh_token } = body;
+
+    if (!refresh_token || typeof refresh_token !== 'string') {
+      throw new AuthenticationError('Refresh token é obrigatório');
+    }
+
+    const tokenHash = generateSHA256(refresh_token);
+
+    // Busca refresh token no banco
+    const storedToken = queryOne<{
+      id: string;
+      participant_id: string;
+      token_hash: string;
+      expires_at: string;
+    }>(
+      'SELECT * FROM refresh_tokens WHERE token_hash = $hash',
+      { hash: tokenHash }
+    );
+
+    if (!storedToken) {
+      logSecurityEvent('REFRESH_TOKEN_REUSE', null, null, { reason: 'token_not_found' });
+      throw new AuthenticationError('Refresh token inválido');
+    }
+
+    // Verifica expiração
+    if (new Date(storedToken.expires_at) < new Date()) {
+      execute('DELETE FROM refresh_tokens WHERE id = :id', { id: storedToken.id });
+      throw new AuthenticationError('Refresh token expirado. Faça login novamente.');
+    }
+
+    // Busca participante
+    const participant = queryOne<Participant>(
+      'SELECT * FROM participants WHERE id = $id',
+      { id: storedToken.participant_id }
+    );
+
+    if (!participant || participant.status === 'expired') {
+      execute('DELETE FROM refresh_tokens WHERE id = :id', { id: storedToken.id });
+      throw new AuthenticationError('Conta não encontrada ou expirada');
+    }
+
+    // Gera novo access token
+    const newAccessToken = generateToken({
+      participant_id: participant.id,
+      voluntary_code: participant.voluntary_code,
+    });
+
+    // Rotação: gera novo refresh token e invalida o anterior
+    const newRefreshTokenPlain = generateRefreshToken();
+    const newRefreshTokenHash = generateSHA256(newRefreshTokenPlain);
+    const newExpiresAt = new Date(
+      Date.now() + env.REFRESH_TOKEN_EXPIRATION_DAYS * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    // Remove o token antigo
+    execute('DELETE FROM refresh_tokens WHERE id = :id', { id: storedToken.id });
+
+    // Insere o novo
+    insert('refresh_tokens', {
+      id: generateUUID(),
+      participant_id: participant.id,
+      token_hash: newRefreshTokenHash,
+      expires_at: newExpiresAt,
+      created_at: formatDate(),
+    });
+
+    logger.info('Token renovado', { participant_id: participant.id });
+
+    return successResponse({
+      token: newAccessToken,
+      refresh_token: newRefreshTokenPlain,
+    }, 'Token renovado com sucesso');
+  } catch (error) {
+    logger.error('Erro ao renovar token', error as Error);
+    throw error;
+  }
+}
+
+/**
+ * Logout - invalida refresh token
+ */
+export async function logoutParticipant(body: any): Promise<any> {
+  try {
+    const { refresh_token } = body;
+
+    if (refresh_token && typeof refresh_token === 'string') {
+      const tokenHash = generateSHA256(refresh_token);
+      execute('DELETE FROM refresh_tokens WHERE token_hash = :hash', { hash: tokenHash });
+    }
+
+    return successResponse(null, 'Logout realizado com sucesso');
+  } catch (error) {
+    logger.error('Erro ao fazer logout', error as Error);
+    throw error;
+  }
+}
+
+/**
+ * Exclui conta do participante (anonimiza dados pessoais, mantém resultados)
+ */
+export async function deleteAccount(params: { token: string }): Promise<any> {
+  try {
+    const { verifyToken } = await import('@/utils/security');
+    const decoded = verifyToken(params.token);
+    if (!decoded) throw new Error('Token inválido');
+
+    const participantId = decoded.participant_id;
+
+    const participant = queryOne<Participant>(
+      'SELECT * FROM participants WHERE id = $id',
+      { id: participantId }
+    );
+
+    if (!participant) {
+      throw new NotFoundError('Participante');
+    }
+
+    // Deleta arquivos físicos de todas as amostras
+    const samples = queryAll<any>(
+      'SELECT * FROM samples WHERE participant_id = $participant_id',
+      { participant_id: participantId }
+    );
+
+    try {
+      const { cleanupSample } = await import('@/services/samplePreparationService');
+      for (const sample of samples) {
+        try {
+          await cleanupSample(sample.carry_code);
+        } catch (e) {
+          logger.warn('Erro ao limpar arquivos da amostra', { carry_code: sample.carry_code });
+        }
+      }
+    } catch (e) {
+      logger.warn('Erro ao importar samplePreparationService para cleanup');
+    }
+
+    // Deleta arquivos de certificados
+    const certificates = queryAll<any>(
+      'SELECT * FROM certificates WHERE participant_id = $participant_id',
+      { participant_id: participantId }
+    );
+    const fs = await import('fs');
+    for (const cert of certificates) {
+      if (cert.file_path) {
+        try { fs.unlinkSync(cert.file_path); } catch (_) {}
+      }
+    }
+
+    // Deleta dados não-essenciais (mantém samples/groups/results para pesquisa)
+    execute('DELETE FROM certificates WHERE participant_id = :participant_id', { participant_id: participantId });
+    execute('DELETE FROM minutiae_markings WHERE participant_id = :participant_id', { participant_id: participantId });
+    execute('DELETE FROM file_tracking WHERE participant_id = :participant_id', { participant_id: participantId });
+    execute('DELETE FROM csrf_tokens WHERE participant_id = :participant_id', { participant_id: participantId });
+    execute('DELETE FROM refresh_tokens WHERE participant_id = :participant_id', { participant_id: participantId });
+
+    // Anonimiza participante (mantém códigos como identificadores para pesquisa)
+    const anonymizedEmail = `deleted_${generateUUID().substring(0, 8)}@removed.local`;
+    update('participants', {
+      voluntary_name: '[Removido]',
+      voluntary_email: anonymizedEmail,
+      status: 'expired',
+      email_verification_token: null,
+      token_expires_at: null,
+      updated_at: formatDate(),
+    }, { id: participantId });
+
+    // Invalida todos os tokens JWT existentes deste participante
+    const { invalidateTokensForParticipant } = await import('@/utils/security');
+    invalidateTokensForParticipant(participantId);
+
+    logSecurityEvent('ACCOUNT_DELETED', null, participantId, { voluntary_code: participant.voluntary_code });
+    logger.info('Conta excluída (anonimizada)', { participant_id: participantId });
+
+    return successResponse(null, 'Conta removida com sucesso. Seus dados pessoais foram apagados.');
+  } catch (error) {
+    logger.error('Erro ao excluir conta', error as Error);
     throw error;
   }
 }

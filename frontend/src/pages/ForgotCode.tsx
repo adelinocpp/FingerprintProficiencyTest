@@ -13,12 +13,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Mail, ChevronLeft, CheckCircle2 } from "lucide-react";
 
-const forgotCodeSchema = z.object({
-  email: z.string().email("Email inválido"),
-});
-
-type ForgotCodeForm = z.infer<typeof forgotCodeSchema>;
-
 export default function ForgotCode() {
   const { t } = useI18n();
   const { toast } = useToast();
@@ -27,11 +21,15 @@ export default function ForgotCode() {
   const [emailSent, setEmailSent] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
 
+  const forgotCodeSchema = z.object({
+    email: z.string().email(t('forgot_code.invalid_email')),
+  });
+
+  type ForgotCodeForm = z.infer<typeof forgotCodeSchema>;
+
   const form = useForm<ForgotCodeForm>({
     resolver: zodResolver(forgotCodeSchema),
-    defaultValues: {
-      email: "",
-    },
+    defaultValues: { email: "" },
   });
 
   const onSubmit = async (data: ForgotCodeForm) => {
@@ -49,22 +47,21 @@ export default function ForgotCode() {
       if (result.success) {
         setEmailSent(true);
         setIsRegistered(result.data.registered);
-        
         toast({
-          title: "Email Enviado!",
+          title: t('forgot_code.email_sent'),
           description: result.data.message,
         });
       } else {
         toast({
-          title: "Erro",
-          description: result.error || "Erro ao enviar email",
+          title: t('common.error'),
+          description: result.error || t('forgot_code.error_send'),
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
-        title: "Erro",
-        description: "Erro ao conectar com o servidor",
+        title: t('common.error'),
+        description: t('forgot_code.error_server'),
         variant: "destructive",
       });
     } finally {
@@ -80,40 +77,33 @@ export default function ForgotCode() {
             <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4 text-green-600">
               <CheckCircle2 className="w-6 h-6" />
             </div>
-            <CardTitle className="text-2xl">Email Enviado!</CardTitle>
-            <CardDescription>Verifique sua caixa de entrada</CardDescription>
+            <CardTitle className="text-2xl">{t('forgot_code.email_sent')}</CardTitle>
+            <CardDescription>{t('forgot_code.check_inbox')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
             <Alert>
               <Mail className="h-4 w-4" />
-              <AlertTitle>Próximos Passos</AlertTitle>
+              <AlertTitle>{t('forgot_code.next_steps')}</AlertTitle>
               <AlertDescription>
                 {isRegistered ? (
                   <ul className="list-disc list-inside space-y-1 text-sm mt-2">
-                    <li>Verifique seu email</li>
-                    <li>Se seu email não foi validado, clique no link de validação</li>
-                    <li>Se já foi validado, use os códigos enviados para fazer login</li>
+                    <li>{t('forgot_code.step_check')}</li>
+                    <li>{t('forgot_code.step_validate')}</li>
+                    <li>{t('forgot_code.step_login')}</li>
                   </ul>
                 ) : (
-                  <p className="text-sm mt-2">
-                    Se este email estiver cadastrado, você receberá um email com instruções.
-                    Caso contrário, você pode se cadastrar agora.
-                  </p>
+                  <p className="text-sm mt-2">{t('forgot_code.not_registered_msg')}</p>
                 )}
               </AlertDescription>
             </Alert>
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
             <Link href="/login" className="w-full">
-              <Button className="w-full">
-                Ir para Login
-              </Button>
+              <Button className="w-full">{t('forgot_code.go_login')}</Button>
             </Link>
             {!isRegistered && (
               <Link href="/register" className="w-full">
-                <Button variant="outline" className="w-full">
-                  Fazer Cadastro
-                </Button>
+                <Button variant="outline" className="w-full">{t('forgot_code.go_register')}</Button>
               </Link>
             )}
           </CardFooter>
@@ -126,9 +116,9 @@ export default function ForgotCode() {
     <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4 relative scientific-grid">
       <Link href="/login" className="absolute top-8 left-8 text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors">
         <ChevronLeft className="w-4 h-4" />
-        Voltar
+        {t('forgot_code.back')}
       </Link>
-      
+
       <Card className="w-full max-w-md shadow-2xl border-t-4 border-t-primary">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-6">
@@ -136,10 +126,8 @@ export default function ForgotCode() {
               <Mail className="w-8 h-8" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-center">Esqueci meu Código</CardTitle>
-          <CardDescription className="text-center">
-            Digite seu email para receber seus códigos de acesso
-          </CardDescription>
+          <CardTitle className="text-2xl text-center">{t('forgot_code.title')}</CardTitle>
+          <CardDescription className="text-center">{t('forgot_code.subtitle')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -149,13 +137,13 @@ export default function ForgotCode() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t('forgot_code.email')}</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="seu@email.com"
+                      <Input
+                        placeholder={t('forgot_code.email_placeholder')}
                         type="email"
-                        className="h-12" 
-                        {...field} 
+                        className="h-12"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -163,20 +151,20 @@ export default function ForgotCode() {
                 )}
               />
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full h-12 text-lg shadow-lg shadow-primary/20 hover:shadow-primary/30"
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Enviando...
+                    {t('forgot_code.sending')}
                   </>
                 ) : (
                   <>
                     <Mail className="mr-2 h-5 w-5" />
-                    Enviar Códigos
+                    {t('forgot_code.send_codes')}
                   </>
                 )}
               </Button>
@@ -185,15 +173,15 @@ export default function ForgotCode() {
         </CardContent>
         <CardFooter className="flex flex-col gap-2 border-t pt-6">
           <div className="text-sm text-muted-foreground text-center">
-            Lembrou do código?
+            {t('forgot_code.remember_code')}
             <Link href="/login" className="ml-1 text-primary hover:underline font-medium">
-              Fazer Login
+              {t('forgot_code.login_link')}
             </Link>
           </div>
           <div className="text-sm text-muted-foreground text-center">
-            Não tem cadastro?
+            {t('forgot_code.no_account')}
             <Link href="/register" className="ml-1 text-primary hover:underline font-medium">
-              Cadastre-se
+              {t('forgot_code.register_link')}
             </Link>
           </div>
         </CardFooter>

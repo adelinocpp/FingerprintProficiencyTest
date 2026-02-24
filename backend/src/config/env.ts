@@ -1,6 +1,11 @@
 import { config } from 'dotenv';
+import crypto from 'crypto';
 
 config();
+
+// Em desenvolvimento, gera um secret aleatório por execução (tokens invalidam ao reiniciar)
+// Em produção, JWT_SECRET DEVE ser definido via variável de ambiente
+const devJwtSecret = crypto.randomBytes(32).toString('hex');
 
 export const env = {
   // Server
@@ -13,8 +18,9 @@ export const env = {
   DATABASE_URL: process.env.DATABASE_URL || './data/fingerprint.db',
 
   // JWT
-  JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-key-change-in-production',
-  JWT_EXPIRATION: process.env.JWT_EXPIRATION || '7d',
+  JWT_SECRET: process.env.JWT_SECRET || devJwtSecret,
+  JWT_EXPIRATION: process.env.JWT_EXPIRATION || '2h',
+  REFRESH_TOKEN_EXPIRATION_DAYS: parseInt(process.env.REFRESH_TOKEN_EXPIRATION_DAYS || '30', 10),
 
   // Email
   EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'gmail',
@@ -41,12 +47,12 @@ export const env = {
   IMAGE_WIDTH: parseInt(process.env.IMAGE_WIDTH || '712', 10),
   IMAGE_HEIGHT: parseInt(process.env.IMAGE_HEIGHT || '855', 10),
   //TODO_DEG - Parâmetros padrão de degradação da imagem questionada (blur elíptico)
-  DEGRADATION_MIN_AREA_PERCENT: parseInt(process.env.DEGRADATION_MIN_AREA_PERCENT || '35', 10),
+  DEGRADATION_MIN_AREA_PERCENT: parseInt(process.env.DEGRADATION_MIN_AREA_PERCENT || '45', 10),
   DEGRADATION_MAX_AREA_PERCENT: parseInt(process.env.DEGRADATION_MAX_AREA_PERCENT || '70', 10),
   DEGRADATION_MIN_ECCENTRICITY: parseFloat(process.env.DEGRADATION_MIN_ECCENTRICITY || '0.7'),
   DEGRADATION_MAX_ECCENTRICITY: parseFloat(process.env.DEGRADATION_MAX_ECCENTRICITY || '0.95'),
   DEGRADATION_NOISE: process.env.DEGRADATION_NOISE === 'true',
-  DEGRADATION_NOISE_INTENSITY: parseFloat(process.env.DEGRADATION_NOISE_INTENSITY || '0.5'),
+  DEGRADATION_NOISE_INTENSITY: parseFloat(process.env.DEGRADATION_NOISE_INTENSITY || '0.75'),
 
   // Sample Generation
   HAS_SAME_SOURCE_PROBABILITY: parseFloat(process.env.HAS_SAME_SOURCE_PROBABILITY || '0.85'),
@@ -100,5 +106,9 @@ export function validateEnv(): void {
         `Missing required environment variables: ${missingEnvVars.join(', ')}`
       );
     }
+  }
+
+  if (!process.env.JWT_SECRET) {
+    console.warn('⚠️  JWT_SECRET não definido. Usando secret aleatório - tokens invalidam ao reiniciar o servidor.');
   }
 }

@@ -25,61 +25,111 @@ export default function MagnifyingLens({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isActive, setIsActive] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [currentZoom, setCurrentZoom] = useState(zoomLevel);
 
-  const updatePosition = useCallback((e: MouseEvent | React.MouseEvent) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    setPosition({
+  // Ref estável para o estado ativo (evita stale closures nos listeners globais)
+  const isActiveRef = useRef(false);
+  const containerRefStable = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
+
+  useEffect(() => {
+    containerRefStable.current = containerRef.current;
+  });
+
+  // Verifica se o mouse está dentro do container
+  const isInBounds = useCallback((e: MouseEvent): boolean => {
+    const container = containerRefStable.current;
+    if (!container) return false;
+    const rect = container.getBoundingClientRect();
+    return (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    );
+  }, []);
+
+  // Calcula posição relativa ao container
+  const getRelativePosition = useCallback((e: MouseEvent) => {
+    const container = containerRefStable.current;
+    if (!container) return { x: 0, y: 0 };
+    const rect = container.getBoundingClientRect();
+    return {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
-    });
-  }, []);
-
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsActive(true);
-    updatePosition(e);
-  }, [updatePosition]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isActive) return;
-    updatePosition(e);
-  }, [isActive, updatePosition]);
-
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    if (e.button === 2) {
-      setIsActive(false);
-    }
-  }, []);
-
-  // Previne o menu de contexto global enquanto a lupa está ativa
-  useEffect(() => {
-    const preventContext = (e: Event) => {
-      if (isActive) e.preventDefault();
     };
-    document.addEventListener('contextmenu', preventContext);
-    return () => document.removeEventListener('contextmenu', preventContext);
-  }, [isActive]);
+  }, []);
+
+  // Listeners globais no document (bypassa z-index do MinutiaeCanvas)
+  useEffect(() => {
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button !== 2) return; // Só botão direito
+      if (!isInBounds(e)) return;
+      e.preventDefault();
+      isActiveRef.current = true;
+      setIsActive(true);
+      setPosition(getRelativePosition(e));
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isActiveRef.current) return;
+      setPosition(getRelativePosition(e));
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button !== 2) return;
+      if (isActiveRef.current) {
+        isActiveRef.current = false;
+        setIsActive(false);
+      }
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      // Previne menu de contexto dentro do container
+      if (isInBounds(e)) {
+        e.preventDefault();
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      if (!isActiveRef.current) return;
+      if (!isInBounds(e)) return;
+      e.preventDefault();
+
+      const delta = e.deltaY > 0 ? -0.3 : 0.3;
+      setCurrentZoom(prev => Math.max(1.5, Math.min(8, prev + delta)));
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('wheel', handleWheel);
+    };
+  }, [isInBounds, getRelativePosition]);
 
   const radius = lensSize / 2;
   const containerRect = containerRef.current?.getBoundingClientRect();
   const containerW = containerRect?.width || 1;
   const containerH = containerRect?.height || 1;
 
-  const bgWidth = containerW * zoomLevel;
-  const bgHeight = containerH * zoomLevel;
-  const bgX = -(position.x * zoomLevel - radius);
-  const bgY = -(position.y * zoomLevel - radius);
+  const bgWidth = containerW * currentZoom;
+  const bgHeight = containerH * currentZoom;
+  const bgX = -(position.x * currentZoom - radius);
+  const bgY = -(position.y * currentZoom - radius);
 
   return (
-    <div
-      ref={containerRef}
-      className="relative"
-      onContextMenu={handleContextMenu}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={() => setIsActive(false)}
-    >
+    <div ref={containerRef} className="relative">
       {children}
 
       {isActive && (
@@ -96,29 +146,35 @@ export default function MagnifyingLens({
             backgroundRepeat: 'no-repeat',
           }}
         >
+          {/* Indicador de zoom */}
+          <span
+            className="absolute bottom-1 right-2 text-[10px] font-mono text-white/80 bg-black/40 px-1 rounded"
+            style={{ pointerEvents: 'none' }}
+          >
+            {currentZoom.toFixed(1)}x
+          </span>
+
           {/* Marcações de minúcias no zoom */}
           {showMarkings && markings.map((m, i) => {
-            // Posição da marcação no espaço do container
             const mx = m.x * containerW;
             const my = m.y * containerH;
-            // Posição no espaço da lupa
-            const lensX = radius + (mx - position.x) * zoomLevel;
-            const lensY = radius + (my - position.y) * zoomLevel;
+            const lensX = radius + (mx - position.x) * currentZoom;
+            const lensY = radius + (my - position.y) * currentZoom;
 
-            // Só renderiza se estiver dentro do círculo da lupa
             const dx = lensX - radius;
             const dy = lensY - radius;
             if (Math.sqrt(dx * dx + dy * dy) > radius + 12) return null;
 
+            const markSize = 24 * currentZoom / 2.5;
             return (
               <div
                 key={i}
                 className="absolute rounded-full pointer-events-none"
                 style={{
-                  width: 24 * zoomLevel / 2.5,
-                  height: 24 * zoomLevel / 2.5,
-                  left: lensX - (12 * zoomLevel / 2.5),
-                  top: lensY - (12 * zoomLevel / 2.5),
+                  width: markSize,
+                  height: markSize,
+                  left: lensX - markSize / 2,
+                  top: lensY - markSize / 2,
                   border: '2px solid rgba(255, 50, 50, 0.85)',
                   backgroundColor: 'rgba(255, 50, 50, 0.25)',
                 }}

@@ -4,7 +4,7 @@ import { ResultSubmissionSchema } from '@utils/validators';
 import { ValidationError, NotFoundError, successResponse } from '@middleware/errorHandler';
 import { Result, Sample, Group } from '../types/index';
 import { generateUUID, formatDate } from '@utils/helpers';
-import { isValidImageIndex, isValidCompatibilityDegree } from '@utils/security';
+import { isValidImageIndex, isValidCompatibilityDegree, sanitizeString } from '@utils/security';
 import { sendEmail, getCertificateEmailTemplate } from '@services/emailService';
 import { createCertificateData, generateCertificateHTML, generateCertificatePDF } from '@services/certificateService';
 import { logger } from '@middleware/logger';
@@ -30,8 +30,11 @@ export async function submitGroupResult(
       has_match,
       matched_image_index,
       compatibility_degree,
-      notes,
+      notes: rawNotes,
     } = validation.data;
+
+    // Sanitiza campo de texto livre
+    const notes = rawNotes ? sanitizeString(rawNotes) : rawNotes;
 
     // Busca o grupo pelo group_id (código ABCD12345)
     logger.info('Buscando grupo:', { group_id });
@@ -157,6 +160,16 @@ export async function submitGroupResult(
  */
 async function completeSample(participantId: string, sampleId: string): Promise<void> {
   try {
+    // Guard: evita gerar certificado/email duplicado
+    const existingCertificate = queryOne<any>(
+      'SELECT id FROM certificates WHERE sample_id = :sample_id',
+      { sample_id: sampleId }
+    );
+    if (existingCertificate) {
+      logger.info('Certificado já existe para esta amostra, pulando', { sample_id: sampleId });
+      return;
+    }
+
     const sample = queryOne<Sample>(
       'SELECT * FROM samples WHERE id = :id AND participant_id = :participant_id',
       { id: sampleId, participant_id: participantId }
@@ -164,6 +177,12 @@ async function completeSample(participantId: string, sampleId: string): Promise<
 
     if (!sample) {
       throw new NotFoundError('Amostra');
+    }
+
+    // Se amostra já está completa, não reprocessar
+    if (sample.status === 'completed') {
+      logger.info('Amostra já completada, pulando', { sample_id: sampleId });
+      return;
     }
 
     // Atualiza status da amostra
@@ -337,6 +356,11 @@ export async function getMinutiaeMarkings(
   imageIndex: number | null
 ): Promise<any> {
   try {
+    // Valida imageType contra whitelist
+    if (imageType !== 'questionada' && imageType !== 'padrao') {
+      throw new ValidationError('image_type deve ser "questionada" ou "padrao"');
+    }
+
     const group = queryOne<Group>(
       'SELECT * FROM groups WHERE group_id = :group_id',
       { group_id: groupId }

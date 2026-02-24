@@ -255,26 +255,7 @@ export default function MinutiaeCanvas({
         className="absolute inset-0 w-full h-full"
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
-        onMouseDown={(e) => {
-          // Botão direito: desativa pointer-events para a lupa funcionar
-          if (e.button === 2) {
-            const container = containerRef.current;
-            if (container) {
-              container.style.pointerEvents = 'none';
-              setTimeout(() => {
-                if (container) container.style.pointerEvents = 'auto';
-              }, 50);
-            }
-          }
-        }}
-        onMouseUp={(e) => {
-          if (e.button === 2) {
-            const container = containerRef.current;
-            if (container) {
-              container.style.pointerEvents = 'auto';
-            }
-          }
-        }}
+        onContextMenu={(e) => e.preventDefault()}
         style={{ cursor: 'crosshair' }}
       />
     </div>

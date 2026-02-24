@@ -1,4 +1,4 @@
-import { queryOne, queryAll, insert } from '@database/db';
+import { queryOne, queryAll, insert, execute } from '@database/db';
 import { NotFoundError, successResponse } from '@middleware/errorHandler';
 import { Sample, Group, GroupImage } from '../types/index';
 import { logger } from '@middleware/logger';
@@ -441,6 +441,51 @@ export async function requestNewSample(params: { token: string }): Promise<any> 
     return result;
   } catch (error) {
     logger.error('Erro ao solicitar nova amostra', error as Error);
+    throw error;
+  }
+}
+
+/**
+ * Rejeita/abandona uma amostra (deleta amostra e arquivos físicos)
+ */
+export async function rejectSample(params: { token: string; sample_id: string }): Promise<any> {
+  try {
+    const { verifyToken } = await import('@/utils/security');
+    const decoded = verifyToken(params.token);
+    if (!decoded) throw new Error('Token inválido');
+
+    const participantId = decoded.participant_id;
+
+    const sample = queryOne<Sample>(
+      'SELECT * FROM samples WHERE id = $id AND participant_id = $participant_id',
+      { id: params.sample_id, participant_id: participantId }
+    );
+
+    if (!sample) {
+      throw new NotFoundError('Amostra');
+    }
+
+    if (sample.status === 'completed') {
+      return { success: false, error: 'Não é possível rejeitar uma amostra já concluída' };
+    }
+
+    // Deleta arquivos físicos
+    try {
+      const { cleanupSample } = await import('@/services/samplePreparationService');
+      await cleanupSample(sample.carry_code);
+      logger.info('Arquivos físicos da amostra removidos', { carry_code: sample.carry_code });
+    } catch (cleanupError) {
+      logger.warn('Erro ao limpar arquivos da amostra', { carry_code: sample.carry_code, error: (cleanupError as Error).message });
+    }
+
+    // Deleta do banco (CASCADE cuida de groups, results, certificates, minutiae)
+    execute('DELETE FROM samples WHERE id = :id', { id: params.sample_id });
+
+    logger.info('Amostra rejeitada', { sample_id: params.sample_id, participant_id: participantId });
+
+    return successResponse({ sample_id: params.sample_id }, 'Amostra rejeitada com sucesso');
+  } catch (error) {
+    logger.error('Erro ao rejeitar amostra', error as Error);
     throw error;
   }
 }

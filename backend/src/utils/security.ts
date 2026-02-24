@@ -64,11 +64,56 @@ export function generateToken(payload: JwtPayload): string {
 }
 
 /**
- * Verifica token JWT
+ * Gera refresh token (string aleatória de 80 hex chars)
+ */
+export function generateRefreshToken(): string {
+  return crypto.randomBytes(40).toString('hex');
+}
+
+/**
+ * Blacklist de tokens invalidados (por participant_id)
+ * Map<participant_id, timestamp_invalidacao>
+ * Tokens emitidos ANTES desse timestamp são rejeitados
+ */
+const tokenBlacklist = new Map<string, number>();
+
+/**
+ * Invalida todos os tokens de um participante
+ */
+export function invalidateTokensForParticipant(participantId: string): void {
+  tokenBlacklist.set(participantId, Math.floor(Date.now() / 1000));
+}
+
+/**
+ * Limpa entradas expiradas da blacklist (chamada periódica)
+ */
+function cleanupBlacklist(): void {
+  const maxTokenLifetime = 7 * 24 * 60 * 60; // 7 dias em segundos
+  const cutoff = Math.floor(Date.now() / 1000) - maxTokenLifetime;
+  for (const [id, timestamp] of tokenBlacklist) {
+    if (timestamp < cutoff) {
+      tokenBlacklist.delete(id);
+    }
+  }
+}
+
+// Limpa blacklist a cada hora
+setInterval(cleanupBlacklist, 60 * 60 * 1000);
+
+/**
+ * Verifica token JWT (inclui checagem de blacklist)
  */
 export function verifyToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload & { iat?: number };
+
+    // Verifica se o participante tem tokens invalidados
+    const invalidatedAt = tokenBlacklist.get(payload.participant_id);
+    if (invalidatedAt && payload.iat && payload.iat <= invalidatedAt) {
+      return null; // Token foi emitido antes da invalidação
+    }
+
+    return payload;
   } catch (error) {
     return null;
   }

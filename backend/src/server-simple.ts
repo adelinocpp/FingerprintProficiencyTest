@@ -3,6 +3,7 @@ import { cors } from '@elysiajs/cors';
 import { env } from './config/env';
 import { initializeDatabase, closeDatabase } from './database/db';
 import { logger } from './middleware/logger';
+import { createRateLimitMiddleware, createOriginValidation } from './middleware/auth';
 
 // Controllers
 import * as authController from './controllers/authController';
@@ -11,6 +12,13 @@ import * as groupController from './controllers/groupController';
 import * as imageController from '@controllers/imageController';
 import { downloadSample } from '@controllers/downloadController';
 import * as resultController from './controllers/resultController';
+
+// Rate limiters (instâncias separadas para diferentes endpoints)
+const authRateLimit = createRateLimitMiddleware(15 * 60 * 1000, 20); // 20 req / 15 min para auth
+const apiRateLimit = createRateLimitMiddleware(15 * 60 * 1000, 100); // 100 req / 15 min para API geral
+
+// Origin validation middleware (K - CSRF protection)
+const originValidation = createOriginValidation();
 
 async function startServer() {
   try {
@@ -21,9 +29,27 @@ async function startServer() {
     // Cria aplicação Elysia
     const app = new Elysia()
       .use(cors({
-        origin: true, // Aceita qualquer origem em desenvolvimento
-        credentials: true
+        origin: env.NODE_ENV === 'production'
+          ? env.FRONTEND_URL
+          : true, // Em desenvolvimento aceita qualquer origem
+        credentials: true,
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       }))
+      // Security headers
+      .onBeforeHandle(({ set, request }) => {
+        set.headers['X-Content-Type-Options'] = 'nosniff';
+        set.headers['X-Frame-Options'] = 'DENY';
+        set.headers['X-XSS-Protection'] = '1; mode=block';
+        set.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin';
+        if (env.NODE_ENV === 'production') {
+          set.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
+        }
+
+        // K - Origin validation (CSRF) para requisições mutantes em produção
+        const blocked = originValidation.beforeHandle({ request, set });
+        if (blocked) return blocked;
+      })
       .onError(({ code, error, set }) => {
         // Não loga NOT_FOUND como erro, é esperado
         if (code !== 'NOT_FOUND') {
@@ -60,8 +86,10 @@ async function startServer() {
         timestamp: new Date().toISOString(),
         environment: env.NODE_ENV || 'development',
       }))
-      // Rotas de autenticação
-      .post('/api/auth/register', async ({ body }: any) => {
+      // Rotas de autenticação (com rate limiting)
+      .post('/api/auth/register', async ({ body, request, set }: any) => {
+        const blocked = authRateLimit.beforeHandle({ request, set });
+        if (blocked) return blocked;
         try {
           return await authController.registerParticipant(body);
         } catch (error: any) {
@@ -73,7 +101,9 @@ async function startServer() {
           };
         }
       })
-      .post('/api/auth/login', async ({ body }: any) => {
+      .post('/api/auth/login', async ({ body, request, set }: any) => {
+        const blocked = authRateLimit.beforeHandle({ request, set });
+        if (blocked) return blocked;
         try {
           return await authController.loginParticipant(body);
         } catch (error: any) {
@@ -85,13 +115,19 @@ async function startServer() {
           };
         }
       })
-      .post('/api/auth/validate-email', async ({ body }: any) => {
+      .post('/api/auth/validate-email', async ({ body, request, set }: any) => {
+        const blocked = authRateLimit.beforeHandle({ request, set });
+        if (blocked) return blocked;
         return await authController.validateEmail(body);
       })
-      .post('/api/auth/validate-code', async ({ body }: any) => {
+      .post('/api/auth/validate-code', async ({ body, request, set }: any) => {
+        const blocked = authRateLimit.beforeHandle({ request, set });
+        if (blocked) return blocked;
         return await authController.validateCode(body);
       })
-      .post('/api/auth/forgot-code', async ({ body }: any) => {
+      .post('/api/auth/forgot-code', async ({ body, request, set }: any) => {
+        const blocked = authRateLimit.beforeHandle({ request, set });
+        if (blocked) return blocked;
         return await authController.forgotCode(body);
       })
       .get('/api/auth/verify-email/:token', async ({ params }: any) => {
@@ -104,6 +140,30 @@ async function startServer() {
             error: error.message || 'Erro ao validar email',
             code: error.code || 'VERIFICATION_ERROR'
           };
+        }
+      })
+      // J - Refresh token
+      .post('/api/auth/refresh', async ({ body, request, set }: any) => {
+        const blocked = authRateLimit.beforeHandle({ request, set });
+        if (blocked) return blocked;
+        try {
+          return await authController.refreshAccessToken(body);
+        } catch (error: any) {
+          logger.error('Erro ao renovar token', error);
+          set.status = 401;
+          return {
+            success: false,
+            error: error.message || 'Erro ao renovar token',
+            code: 'REFRESH_ERROR'
+          };
+        }
+      })
+      // J - Logout (invalida refresh token)
+      .post('/api/auth/logout', async ({ body }: any) => {
+        try {
+          return await authController.logoutParticipant(body);
+        } catch (error: any) {
+          return { success: true }; // Logout nunca falha para o cliente
         }
       })
       // Rotas de amostras (protegidas)
@@ -148,6 +208,42 @@ async function startServer() {
           };
         }
       })
+      // Rejeitar amostra
+      .delete('/api/samples/:id', async ({ params, headers }: any) => {
+        try {
+          const authHeader = headers['authorization'];
+          if (!authHeader) {
+            return { success: false, error: 'Não autorizado' };
+          }
+          const token = authHeader.replace('Bearer ', '');
+          return await sampleController.rejectSample({ token, sample_id: params.id });
+        } catch (error: any) {
+          logger.error('Erro ao rejeitar amostra', error);
+          return {
+            success: false,
+            error: error.message || 'Erro ao rejeitar amostra',
+            code: error.code || 'REJECT_SAMPLE_ERROR'
+          };
+        }
+      })
+      // Excluir conta
+      .delete('/api/account', async ({ headers }: any) => {
+        try {
+          const authHeader = headers['authorization'];
+          if (!authHeader) {
+            return { success: false, error: 'Não autorizado' };
+          }
+          const token = authHeader.replace('Bearer ', '');
+          return await authController.deleteAccount({ token });
+        } catch (error: any) {
+          logger.error('Erro ao excluir conta', error);
+          return {
+            success: false,
+            error: error.message || 'Erro ao excluir conta',
+            code: error.code || 'DELETE_ACCOUNT_ERROR'
+          };
+        }
+      })
       // Rotas de grupos
       .post('/api/samples/:id/groups', async ({ params }: any) => {
         return await groupController.createGroupsForSample(params.id);
@@ -177,10 +273,27 @@ async function startServer() {
         }
         return result;
       })
-      // Download de amostra
-      .get('/api/samples/:id/download', async ({ params, set }: any) => {
+      // Download de amostra (protegido)
+      .get('/api/samples/:id/download', async ({ params, headers, query, set }: any) => {
         try {
-          const { filePath, fileName } = await downloadSample(params.id);
+          // Aceita token via header ou query param (para window.open)
+          const authHeader = headers['authorization'];
+          const tokenFromQuery = query?.token;
+          const token = authHeader ? authHeader.replace('Bearer ', '') : tokenFromQuery;
+
+          if (!token) {
+            set.status = 401;
+            return { success: false, error: 'Não autorizado' };
+          }
+
+          const { verifyToken } = await import('@/utils/security');
+          const payload = verifyToken(token);
+          if (!payload || !payload.participant_id) {
+            set.status = 401;
+            return { success: false, error: 'Token inválido' };
+          }
+
+          const { filePath, fileName } = await downloadSample(params.id, payload.participant_id);
           set.headers['Content-Type'] = 'application/zip';
           set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
           return Bun.file(filePath);

@@ -1,6 +1,7 @@
 import { verifyToken } from '@utils/security';
-import { logger } from './logger';
+import { logger, logSecurityEvent } from './logger';
 import { JwtPayload } from '../types/index';
+import { env } from '@config/env';
 
 /**
  * Extrai token do header Authorization
@@ -83,6 +84,10 @@ export function requireAuth() {
       const payload = validateAuthToken(token);
 
       if (!payload) {
+        const ip = request.headers.get('x-forwarded-for') || 'unknown';
+        logSecurityEvent('INVALID_TOKEN', ip, null, {
+          endpoint: new URL(request.url).pathname,
+        });
         set.status = 401;
         return {
           success: false,
@@ -97,7 +102,49 @@ export function requireAuth() {
 }
 
 /**
- * Middleware para verificar CSRF token
+ * Middleware de validação de Origin (proteção CSRF para SPA)
+ * Para SPAs com bearer tokens, verificar Origin é mais eficaz que tokens CSRF tradicionais
+ */
+export function createOriginValidation() {
+  return {
+    beforeHandle: ({ request, set }: any) => {
+      // Apenas para métodos que modificam dados
+      if (!['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method)) {
+        return;
+      }
+
+      // Em desenvolvimento, não valida (permite qualquer origin)
+      if (env.NODE_ENV !== 'production') {
+        return;
+      }
+
+      const origin = request.headers.get('origin');
+      const referer = request.headers.get('referer');
+
+      // Pelo menos um deve estar presente e apontar para o frontend
+      const allowedOrigin = env.FRONTEND_URL;
+      const originValid = origin && origin.startsWith(allowedOrigin);
+      const refererValid = referer && referer.startsWith(allowedOrigin);
+
+      if (!originValid && !refererValid) {
+        const ip = request.headers.get('x-forwarded-for') || 'unknown';
+        logSecurityEvent('ORIGIN_REJECTED', ip, null, {
+          origin,
+          referer,
+          endpoint: new URL(request.url).pathname,
+        });
+        set.status = 403;
+        return {
+          success: false,
+          error: 'Origin não permitido',
+        };
+      }
+    },
+  };
+}
+
+/**
+ * Middleware para verificar CSRF token (mantido para compatibilidade)
  */
 export function verifyCsrfToken() {
   return {
@@ -121,10 +168,11 @@ export function verifyCsrfToken() {
 }
 
 /**
- * Middleware para rate limiting
+ * Middleware para rate limiting com suporte a IP + conta
+ * Rastreia por IP e opcionalmente por código de conta
  */
 export function createRateLimitMiddleware(
-  windowMs: number = 15 * 60 * 1000, // 15 minutos
+  windowMs: number = 15 * 60 * 1000,
   maxRequests: number = 100
 ) {
   const requestCounts = new Map<string, number[]>();
@@ -139,6 +187,11 @@ export function createRateLimitMiddleware(
       const recentRequests = userRequests.filter((time) => now - time < windowMs);
 
       if (recentRequests.length >= maxRequests) {
+        logSecurityEvent('RATE_LIMIT_HIT', ip, null, {
+          endpoint: new URL(request.url).pathname,
+          count: recentRequests.length,
+          limit: maxRequests,
+        });
         set.status = 429;
         return {
           success: false,
@@ -152,6 +205,62 @@ export function createRateLimitMiddleware(
     },
   };
 }
+
+/**
+ * Rate limiter por conta (código do participante) com lockout
+ * Bloqueia após N falhas consecutivas numa janela de tempo
+ */
+const accountFailures = new Map<string, { count: number; firstFailure: number; lockedUntil: number }>();
+
+export function recordAccountFailure(code: string): void {
+  const now = Date.now();
+  const window = 15 * 60 * 1000; // 15 minutos
+  const maxFailures = 10;
+  const lockoutMs = 30 * 60 * 1000; // 30 minutos de lockout
+
+  const record = accountFailures.get(code);
+
+  if (!record || (now - record.firstFailure > window)) {
+    // Nova janela
+    accountFailures.set(code, { count: 1, firstFailure: now, lockedUntil: 0 });
+    return;
+  }
+
+  record.count++;
+  if (record.count >= maxFailures) {
+    record.lockedUntil = now + lockoutMs;
+    logSecurityEvent('ACCOUNT_LOCKED', null, null, {
+      code,
+      failures: record.count,
+      locked_until: new Date(record.lockedUntil).toISOString(),
+    });
+  }
+}
+
+export function clearAccountFailures(code: string): void {
+  accountFailures.delete(code);
+}
+
+export function isAccountLocked(code: string): boolean {
+  const record = accountFailures.get(code);
+  if (!record) return false;
+  if (record.lockedUntil > Date.now()) return true;
+  // Lockout expirou
+  if (record.lockedUntil > 0) {
+    accountFailures.delete(code);
+  }
+  return false;
+}
+
+// Limpa registros antigos a cada hora
+setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  for (const [code, record] of accountFailures) {
+    if (record.firstFailure < cutoff && record.lockedUntil < Date.now()) {
+      accountFailures.delete(code);
+    }
+  }
+}, 60 * 60 * 1000);
 
 /**
  * Middleware para validar content-type

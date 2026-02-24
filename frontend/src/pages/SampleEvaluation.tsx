@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation, useRoute } from "wouter";
+import { useI18n } from "@/i18n/i18n";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, Loader2, Save, SendHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Save, SendHorizontal, HelpCircle, X } from "lucide-react";
 import GroupViewer from "@/components/GroupViewer";
 import SaveStatusIndicator, { type SaveStatus } from "@/components/SaveStatusIndicator";
 
@@ -18,6 +19,7 @@ function isEvaluationComplete(ev: any): boolean {
 }
 
 export default function SampleEvaluation() {
+  const { t } = useI18n();
   const [_, setLocation] = useLocation();
   const [match, params] = useRoute("/samples/:id/evaluate");
   const { toast } = useToast();
@@ -31,6 +33,7 @@ export default function SampleEvaluation() {
   const [partialEvaluations, setPartialEvaluations] = useState<Map<string, any>>(new Map());
   const [currentEvaluation, setCurrentEvaluation] = useState<any>({});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [showHelp, setShowHelp] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -67,7 +70,6 @@ export default function SampleEvaluation() {
       const token = localStorage.getItem("token");
       if (!token) { setLocation("/login"); return; }
 
-      // Carrega amostra
       const sampleResponse = await fetch(`${API_URL}/samples/${params?.id}`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
@@ -76,7 +78,6 @@ export default function SampleEvaluation() {
         setSample(sampleResult.data);
       }
 
-      // Carrega grupos
       const response = await fetch(`${API_URL}/samples/${params?.id}/groups`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
@@ -91,7 +92,6 @@ export default function SampleEvaluation() {
         }));
         setGroups(parsedGroups);
 
-        // Carrega resultados já salvos no servidor
         const resultsResponse = await fetch(`${API_URL}/results/sample/${params?.id}`, {
           headers: { "Authorization": `Bearer ${token}` },
         });
@@ -115,7 +115,6 @@ export default function SampleEvaluation() {
           }
         }
 
-        // Também marca grupos com status 'completed' no backend
         parsedGroups.forEach((group: any) => {
           if (group.status === 'completed') {
             completed.add(group.group_id);
@@ -125,7 +124,6 @@ export default function SampleEvaluation() {
         setCompletedGroups(completed);
         setPartialEvaluations(restoredEvaluations);
 
-        // Posiciona no primeiro grupo não completo
         const firstIncomplete = parsedGroups.findIndex(
           (g: any) => !completed.has(g.group_id)
         );
@@ -138,8 +136,8 @@ export default function SampleEvaluation() {
     } catch (error) {
       console.error("Erro ao carregar grupos:", error);
       toast({
-        title: "Erro",
-        description: "Não foi possível carregar os grupos",
+        title: t('common.error'),
+        description: t('eval.error_load'),
         variant: "destructive",
       });
     } finally {
@@ -164,22 +162,21 @@ export default function SampleEvaluation() {
         }));
         setGroups(parsedGroups);
         toast({
-          title: "Grupos criados!",
-          description: `${result.data.total} grupos foram gerados para avaliação`,
+          title: t('eval.groups_created'),
+          description: t('eval.groups_created_desc', { n: String(result.data.total) }),
         });
       } else {
         throw new Error(result.error);
       }
     } catch (error: any) {
       toast({
-        title: "Erro",
-        description: error.message || "Não foi possível criar os grupos",
+        title: t('common.error'),
+        description: error.message || t('eval.error_create'),
         variant: "destructive",
       });
     }
   };
 
-  // Salva resultado de um grupo no servidor
   const saveGroupToServer = useCallback(async (groupId: string, evaluation: any): Promise<boolean> => {
     if (!isEvaluationComplete(evaluation)) return false;
 
@@ -222,13 +219,42 @@ export default function SampleEvaluation() {
     }
   }, [API_URL]);
 
-  // Navega para um grupo, salvando o atual se completo
+  const saveCurrentGroup = useCallback(async (): Promise<boolean> => {
+    const currentGroup = groups[currentGroupIndex];
+    if (!currentGroup || Object.keys(currentEvaluation).length === 0) return false;
+
+    const newMap = new Map(partialEvaluations);
+    newMap.set(currentGroup.group_id, currentEvaluation);
+    setPartialEvaluations(newMap);
+
+    const complete = isEvaluationComplete(currentEvaluation);
+
+    if (complete) {
+      const saved = await saveGroupToServer(currentGroup.group_id, currentEvaluation);
+      setCompletedGroups(prev => {
+        const newSet = new Set(prev);
+        newSet.add(currentGroup.group_id);
+        return newSet;
+      });
+      setPartialGroups(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(currentGroup.group_id);
+        return newSet;
+      });
+      return saved;
+    } else {
+      if (!completedGroups.has(currentGroup.group_id)) {
+        setPartialGroups(prev => new Set([...prev, currentGroup.group_id]));
+      }
+      return false;
+    }
+  }, [groups, currentGroupIndex, currentEvaluation, partialEvaluations, completedGroups, saveGroupToServer]);
+
   const goToGroup = useCallback(async (index: number) => {
     if (index < 0 || index >= groups.length) return;
 
     const currentGroup = groups[currentGroupIndex];
 
-    // Salva estado atual em memória
     if (currentGroup && Object.keys(currentEvaluation).length > 0) {
       const newMap = new Map(partialEvaluations);
       newMap.set(currentGroup.group_id, currentEvaluation);
@@ -237,9 +263,7 @@ export default function SampleEvaluation() {
       const complete = isEvaluationComplete(currentEvaluation);
 
       if (complete) {
-        // Auto-save no servidor
-        const saved = await saveGroupToServer(currentGroup.group_id, currentEvaluation);
-
+        await saveGroupToServer(currentGroup.group_id, currentEvaluation);
         setCompletedGroups(prev => {
           const newSet = new Set(prev);
           newSet.add(currentGroup.group_id);
@@ -250,18 +274,6 @@ export default function SampleEvaluation() {
           newSet.delete(currentGroup.group_id);
           return newSet;
         });
-
-        // Verifica se era o último grupo
-        const newCompletedCount = completedGroups.size +
-          (completedGroups.has(currentGroup.group_id) ? 0 : 1);
-        if (saved && newCompletedCount === groups.length) {
-          toast({
-            title: "Avaliação completa!",
-            description: "Todos os grupos foram avaliados. Certificado sendo gerado...",
-          });
-          setTimeout(() => setLocation("/dashboard"), 3000);
-          return;
-        }
       } else {
         if (!completedGroups.has(currentGroup.group_id)) {
           setPartialGroups(prev => new Set([...prev, currentGroup.group_id]));
@@ -273,7 +285,7 @@ export default function SampleEvaluation() {
     const nextGroup = groups[index];
     const savedEvaluation = partialEvaluations.get(nextGroup.group_id);
     setCurrentEvaluation(savedEvaluation || {});
-  }, [groups, currentGroupIndex, currentEvaluation, partialEvaluations, completedGroups, saveGroupToServer, setLocation, toast]);
+  }, [groups, currentGroupIndex, currentEvaluation, partialEvaluations, completedGroups, saveGroupToServer]);
 
   const getGroupStatus = (groupId: string) => {
     if (completedGroups.has(groupId)) return 'completed';
@@ -281,12 +293,89 @@ export default function SampleEvaluation() {
     return 'pending';
   };
 
+  const goToPrevGroup = useCallback(async () => {
+    if (currentGroupIndex > 0) await goToGroup(currentGroupIndex - 1);
+  }, [currentGroupIndex, goToGroup]);
+
+  const goToNextGroup = useCallback(async () => {
+    if (currentGroupIndex < groups.length - 1) await goToGroup(currentGroupIndex + 1);
+  }, [currentGroupIndex, groups.length, goToGroup]);
+
+  const handleFinish = useCallback(async () => {
+    const currentGroup = groups[currentGroupIndex];
+    if (isEvaluationComplete(currentEvaluation) && !completedGroups.has(currentGroup?.group_id)) {
+      const saved = await saveGroupToServer(currentGroup.group_id, currentEvaluation);
+      if (saved) {
+        setCompletedGroups(prev => new Set([...prev, currentGroup.group_id]));
+      }
+    }
+    const allDone = completedGroups.size >= groups.length ||
+      (completedGroups.size === groups.length - 1 && isEvaluationComplete(currentEvaluation));
+    if (allDone) {
+      toast({ title: t('eval.finished'), description: t('eval.cert_generating') });
+      setTimeout(() => setLocation("/dashboard"), 3000);
+    } else {
+      const remaining = groups.length - completedGroups.size;
+      toast({
+        title: t('eval.incomplete_groups'),
+        description: t('eval.incomplete_desc', { n: String(remaining) }),
+        variant: "destructive",
+      });
+    }
+  }, [groups, currentGroupIndex, currentEvaluation, completedGroups, saveGroupToServer, toast, setLocation, t]);
+
+  const handleSaveGroup = useCallback(async () => {
+    const currentGroup = groups[currentGroupIndex];
+    if (!currentGroup) return;
+
+    if (isEvaluationComplete(currentEvaluation)) {
+      const saved = await saveGroupToServer(currentGroup.group_id, currentEvaluation);
+      if (saved) {
+        setCompletedGroups(prev => new Set([...prev, currentGroup.group_id]));
+        setPartialGroups(prev => { const s = new Set(prev); s.delete(currentGroup.group_id); return s; });
+        toast({ title: t('eval.group_saved'), description: t('eval.group_saved_desc', { n: String(currentGroupIndex + 1) }) });
+      }
+    } else {
+      const newMap = new Map(partialEvaluations);
+      newMap.set(currentGroup.group_id, currentEvaluation);
+      setPartialEvaluations(newMap);
+      setPartialGroups(prev => new Set([...prev, currentGroup.group_id]));
+      toast({ title: t('eval.progress_saved'), description: t('eval.progress_saved_desc') });
+    }
+  }, [groups, currentGroupIndex, currentEvaluation, saveGroupToServer, partialEvaluations, toast, t]);
+
+  const GroupNavButtons = () => (
+    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+      {groups.map((group, index) => {
+        const status = getGroupStatus(group.group_id);
+        const isCurrent = index === currentGroupIndex;
+
+        let bgColor = 'bg-red-100 border-red-300 text-red-700';
+        if (status === 'completed') bgColor = 'bg-green-100 border-green-300 text-green-700';
+        else if (status === 'partial') bgColor = 'bg-yellow-100 border-yellow-300 text-yellow-700';
+
+        return (
+          <button
+            key={group.id}
+            onClick={() => goToGroup(index)}
+            className={`w-9 h-9 rounded-md border-2 font-bold text-xs transition-all ${
+              isCurrent ? 'ring-2 ring-primary ring-offset-1 scale-110' : 'hover:scale-105'
+            } ${bgColor}`}
+            title={`Grupo ${index + 1} - ${group.group_id}`}
+          >
+            {index + 1}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-muted/30 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p>Carregando grupos de avaliação...</p>
+          <p>{t('eval.loading')}</p>
         </div>
       </div>
     );
@@ -297,10 +386,8 @@ export default function SampleEvaluation() {
       <div className="min-h-screen bg-muted/30 flex items-center justify-center">
         <Card className="max-w-md">
           <CardHeader>
-            <CardTitle>Nenhum grupo disponível</CardTitle>
-            <CardDescription>
-              Não foi possível carregar ou criar grupos para esta amostra.
-            </CardDescription>
+            <CardTitle>{t('eval.no_groups')}</CardTitle>
+            <CardDescription>{t('eval.no_groups_desc')}</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -311,52 +398,35 @@ export default function SampleEvaluation() {
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
-      {/* Header compacto com navegação */}
+      {/* Header */}
       <header className="bg-white border-b shrink-0">
         <div className="px-4 py-2 flex items-center gap-4">
-          <h1 className="text-lg font-bold whitespace-nowrap">Avaliação de Amostras</h1>
+          <h1 className="text-lg font-bold whitespace-nowrap">
+            {t('eval.title')} {sample?.carry_code || ''}
+          </h1>
 
-          {/* Navegação numérica dos grupos */}
-          <div className="flex-1 flex items-center justify-center gap-1.5 flex-wrap">
-            {groups.map((group, index) => {
-              const status = getGroupStatus(group.group_id);
-              const isCurrent = index === currentGroupIndex;
-
-              let bgColor = 'bg-red-100 border-red-300 text-red-700';
-              if (status === 'completed') bgColor = 'bg-green-100 border-green-300 text-green-700';
-              else if (status === 'partial') bgColor = 'bg-yellow-100 border-yellow-300 text-yellow-700';
-
-              return (
-                <button
-                  key={group.id}
-                  onClick={() => goToGroup(index)}
-                  className={`w-9 h-9 rounded-md border-2 font-bold text-xs transition-all ${
-                    isCurrent ? 'ring-2 ring-primary ring-offset-1 scale-110' : 'hover:scale-105'
-                  } ${bgColor}`}
-                  title={`Grupo ${index + 1} - ${group.group_id}`}
-                >
-                  {index + 1}
-                </button>
-              );
-            })}
+          <div className="flex-1">
+            <GroupNavButtons />
           </div>
 
-          {/* Status save + botão voltar */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <SaveStatusIndicator
               status={saveStatus}
               completedCount={completedGroups.size}
               totalCount={groups.length}
             />
+            <Button variant="outline" size="sm" onClick={() => setShowHelp(true)} title={t('eval.instructions')}>
+              <HelpCircle className="w-4 h-4" />
+            </Button>
             <Button variant="outline" size="sm" onClick={() => goToGroup(currentGroupIndex).then(() => setLocation("/dashboard"))}>
               <ChevronLeft className="w-4 h-4 mr-1" />
-              Dashboard
+              {t('eval.dashboard')}
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Conteúdo principal - scroll vertical livre */}
+      {/* Main content */}
       <main className="flex-1 px-4 py-3">
         {currentGroup && sample ? (
           <GroupViewer
@@ -368,70 +438,116 @@ export default function SampleEvaluation() {
         ) : (
           <div className="text-center py-10">
             <p className="text-muted-foreground">
-              {!sample ? 'Carregando dados da amostra...' : 'Carregando grupo...'}
+              {!sample ? t('eval.loading_sample') : t('eval.loading_group')}
             </p>
           </div>
         )}
 
-        {/* Botões Salvar e Finalizar */}
+        {/* Bottom navigation */}
         {currentGroup && sample && (
-          <div className="flex justify-center gap-4 py-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (isEvaluationComplete(currentEvaluation)) {
-                  saveGroupToServer(currentGroup.group_id, currentEvaluation).then(saved => {
-                    if (saved) {
-                      setCompletedGroups(prev => new Set([...prev, currentGroup.group_id]));
-                      setPartialGroups(prev => { const s = new Set(prev); s.delete(currentGroup.group_id); return s; });
-                      toast({ title: "Grupo salvo!", description: `Grupo ${currentGroupIndex + 1} salvo no servidor.` });
-                    }
-                  });
-                } else {
-                  // Salva em memória como parcial
-                  const newMap = new Map(partialEvaluations);
-                  newMap.set(currentGroup.group_id, currentEvaluation);
-                  setPartialEvaluations(newMap);
-                  setPartialGroups(prev => new Set([...prev, currentGroup.group_id]));
-                  toast({ title: "Progresso salvo", description: "Complete todos os campos para salvar no servidor." });
-                }
-              }}
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Salvar Grupo {currentGroupIndex + 1}
-            </Button>
+          <div className="border rounded-lg bg-white p-3 mt-3 shrink-0">
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" disabled={currentGroupIndex === 0} onClick={goToPrevGroup}>
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                {t('eval.previous')}
+              </Button>
 
-            <Button
-              disabled={completedGroups.size < groups.length}
-              onClick={async () => {
-                // Salva o grupo atual se completo
-                if (isEvaluationComplete(currentEvaluation) && !completedGroups.has(currentGroup.group_id)) {
-                  const saved = await saveGroupToServer(currentGroup.group_id, currentEvaluation);
-                  if (saved) {
-                    setCompletedGroups(prev => new Set([...prev, currentGroup.group_id]));
-                  }
-                }
-                // Verifica se todos estão completos
-                const allDone = completedGroups.size >= groups.length ||
-                  (completedGroups.size === groups.length - 1 && isEvaluationComplete(currentEvaluation));
-                if (allDone) {
-                  toast({ title: "Avaliação finalizada!", description: "Certificado sendo gerado..." });
-                  setTimeout(() => setLocation("/dashboard"), 3000);
-                } else {
-                  toast({
-                    title: "Grupos incompletos",
-                    description: `${groups.length - completedGroups.size} grupo(s) ainda precisam ser avaliados.`,
-                    variant: "destructive",
-                  });
-                }
-              }}
-            >
-              <SendHorizontal className="w-4 h-4 mr-2" />
-              Finalizar Avaliação ({completedGroups.size}/{groups.length})
-            </Button>
+              <div className="flex-1">
+                <GroupNavButtons />
+              </div>
+
+              <Button variant="outline" size="sm" disabled={currentGroupIndex === groups.length - 1} onClick={goToNextGroup}>
+                {t('eval.next')}
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+
+              <div className="w-px h-8 bg-gray-200" />
+
+              <Button variant="outline" size="sm" onClick={handleSaveGroup}>
+                <Save className="w-4 h-4 mr-1" />
+                {t('eval.save_group')} {currentGroupIndex + 1}
+              </Button>
+
+              <Button size="sm" disabled={completedGroups.size < groups.length} onClick={handleFinish}>
+                <SendHorizontal className="w-4 h-4 mr-1" />
+                {t('eval.finish')} ({completedGroups.size}/{groups.length})
+              </Button>
+            </div>
           </div>
         )}
       </main>
+
+      {/* Help modal */}
+      {showHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowHelp(false)}>
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white rounded-t-lg">
+              <h2 className="text-lg font-bold">{t('eval.help_title')}</h2>
+              <button onClick={() => setShowHelp(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 text-sm text-gray-700 leading-relaxed">
+              <section>
+                <h3 className="font-semibold text-base text-gray-900 mb-1">{t('eval.help_objective')}</h3>
+                <p>{t('eval.help_objective_text')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-base text-gray-900 mb-1">{t('eval.help_navigation')}</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>{t('eval.help_nav_1')}</li>
+                  <li>{t('eval.help_nav_2')}</li>
+                  <li>{t('eval.help_nav_3')}</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-base text-gray-900 mb-1">{t('eval.help_zoom')}</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>{t('eval.help_zoom_1')}</li>
+                  <li>{t('eval.help_zoom_2')}</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-base text-gray-900 mb-1">{t('eval.help_minutiae')}</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>{t('eval.help_min_1')}</li>
+                  <li>{t('eval.help_min_2')}</li>
+                  <li>{t('eval.help_min_3')}</li>
+                  <li>{t('eval.help_min_4')}</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-base text-gray-900 mb-1">{t('eval.help_form')}</h3>
+                <ol className="list-decimal pl-5 space-y-1">
+                  <li>{t('eval.help_form_1')}</li>
+                  <li>{t('eval.help_form_2')}</li>
+                  <li>{t('eval.help_form_3')}</li>
+                </ol>
+                <p className="mt-1">{t('eval.help_form_reset')}</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-base text-gray-900 mb-1">{t('eval.help_save')}</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>{t('eval.help_save_1')}</li>
+                  <li>{t('eval.help_save_2')}</li>
+                  <li>{t('eval.help_save_3')} <span className="text-green-600 font-medium">{t('eval.help_status_complete')}</span>,
+                    <span className="text-yellow-600 font-medium"> {t('eval.help_status_partial')}</span>,
+                    <span className="text-red-600 font-medium"> {t('eval.help_status_pending')}</span>.
+                  </li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

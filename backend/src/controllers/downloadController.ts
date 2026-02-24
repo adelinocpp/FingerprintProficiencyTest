@@ -15,9 +15,9 @@ interface Sample {
 /**
  * Faz download do ZIP da amostra
  */
-export async function downloadSample(sampleId: string): Promise<{ filePath: string; fileName: string }> {
+export async function downloadSample(sampleId: string, participantId?: string): Promise<{ filePath: string; fileName: string }> {
   try {
-    logger.info('Solicitação de download de amostra', { sample_id: sampleId });
+    logger.info('Solicitação de download de amostra', { sample_id: sampleId, participant_id: participantId });
 
     const sample = queryOne<Sample>(
       'SELECT * FROM samples WHERE id = $id',
@@ -25,6 +25,11 @@ export async function downloadSample(sampleId: string): Promise<{ filePath: stri
     );
 
     if (!sample) {
+      throw new NotFoundError('Amostra não encontrada');
+    }
+
+    // Verifica se a amostra pertence ao participante
+    if (participantId && sample.participant_id !== participantId) {
       throw new NotFoundError('Amostra não encontrada');
     }
 

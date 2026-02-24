@@ -240,6 +240,33 @@ CREATE TABLE IF NOT EXISTS minutiae_markings (
 CREATE INDEX IF NOT EXISTS idx_minutiae_group_id ON minutiae_markings(group_id);
 CREATE INDEX IF NOT EXISTS idx_minutiae_participant_id ON minutiae_markings(participant_id);
 CREATE INDEX IF NOT EXISTS idx_minutiae_sample_id ON minutiae_markings(sample_id);
+
+-- Tabela de refresh tokens
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id TEXT PRIMARY KEY,
+  participant_id TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (participant_id) REFERENCES participants(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_participant_id ON refresh_tokens(participant_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
+
+-- Tabela de eventos de segurança
+CREATE TABLE IF NOT EXISTS security_events (
+  id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  participant_id TEXT,
+  ip_address TEXT,
+  details TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_security_events_type ON security_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_security_events_ip ON security_events(ip_address);
+CREATE INDEX IF NOT EXISTS idx_security_events_created_at ON security_events(created_at);
 `;
 
 /**
@@ -273,6 +300,14 @@ export const cleanupQueries = [
    WHERE datetime(expires_at) < datetime('now')`,
   
   // Remove logs de acesso antigos (mais de 90 dias)
-  `DELETE FROM access_logs 
+  `DELETE FROM access_logs
    WHERE datetime(timestamp, '+90 days') < datetime('now')`,
+
+  // Remove refresh tokens expirados
+  `DELETE FROM refresh_tokens
+   WHERE datetime(expires_at) < datetime('now')`,
+
+  // Remove eventos de segurança antigos (mais de 90 dias)
+  `DELETE FROM security_events
+   WHERE datetime(created_at, '+90 days') < datetime('now')`,
 ];

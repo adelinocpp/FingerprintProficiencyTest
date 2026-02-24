@@ -1,6 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Participant, LoginRequest, RegisterRequest } from '../types/index';
-import { authAPI, saveToken, getToken, removeToken, decodeToken } from '../services/api';
+import {
+  authAPI,
+  saveToken, getToken, removeToken,
+  saveRefreshToken, getRefreshToken, removeRefreshToken,
+  decodeToken,
+} from '../services/api';
 
 export interface UseAuthReturn {
   participant: Participant | null;
@@ -27,15 +32,28 @@ export function useAuth(): UseAuthReturn {
   useEffect(() => {
     const savedToken = getToken();
     if (savedToken) {
-      setToken(savedToken);
-      // Valida token
       const decoded = decodeToken(savedToken);
       if (decoded && decoded.exp * 1000 > Date.now()) {
-        // Token ainda é válido
+        setToken(savedToken);
       } else {
-        // Token expirado
-        removeToken();
-        setToken(null);
+        // Access token expirado - tenta refresh
+        const refreshToken = getRefreshToken();
+        if (refreshToken) {
+          authAPI.refresh(refreshToken).then((res: any) => {
+            if (res.success && res.data?.token) {
+              saveToken(res.data.token);
+              if (res.data.refresh_token) {
+                saveRefreshToken(res.data.refresh_token);
+              }
+              setToken(res.data.token);
+            } else {
+              removeToken();
+              removeRefreshToken();
+            }
+          });
+        } else {
+          removeToken();
+        }
       }
     }
   }, []);
@@ -74,15 +92,20 @@ export function useAuth(): UseAuthReturn {
         const response = await authAPI.login(data);
 
         if (!response.success || !response.data) {
-          setError(response.message || 'Erro ao fazer login');
+          setError(response.message || response.error || 'Erro ao fazer login');
           return response;
         }
 
-        const { token: newToken, participant: newParticipant } = response.data as any;
+        const { token: newToken, refresh_token: newRefreshToken, participant: newParticipant } = response.data as any;
 
         saveToken(newToken);
         setToken(newToken);
         setParticipant(newParticipant);
+
+        // Salva refresh token se recebido
+        if (newRefreshToken) {
+          saveRefreshToken(newRefreshToken);
+        }
 
         return response;
       } catch (err) {
@@ -97,7 +120,14 @@ export function useAuth(): UseAuthReturn {
   );
 
   const logout = useCallback(() => {
+    // Invalida refresh token no servidor (best-effort)
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      authAPI.logout(refreshToken).catch(() => {});
+    }
+
     removeToken();
+    removeRefreshToken();
     setToken(null);
     setParticipant(null);
     setError(null);

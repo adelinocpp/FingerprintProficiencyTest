@@ -187,3 +187,56 @@ export function logSensitiveAction(
     ...details,
   });
 }
+
+/**
+ * Tipos de eventos de segurança
+ */
+export type SecurityEventType =
+  | 'AUTH_FAILURE'         // Login falhou (código inválido)
+  | 'AUTH_UNVERIFIED'      // Login com email não verificado
+  | 'RATE_LIMIT_HIT'      // Rate limit atingido
+  | 'INVALID_TOKEN'       // Token JWT inválido/expirado
+  | 'PATH_TRAVERSAL'      // Tentativa de path traversal
+  | 'ORIGIN_REJECTED'     // Origin inválido (CSRF)
+  | 'ACCOUNT_LOCKED'      // Conta bloqueada por tentativas
+  | 'REFRESH_TOKEN_REUSE' // Tentativa de reutilizar refresh token
+  | 'ACCOUNT_DELETED';    // Conta excluída
+
+/**
+ * Registra evento de segurança no banco e no log
+ */
+export function logSecurityEvent(
+  eventType: SecurityEventType,
+  ip: string | null,
+  participantId: string | null,
+  details?: Record<string, any>
+): void {
+  const detailsStr = details ? JSON.stringify(details) : null;
+
+  logger.warn(`SECURITY [${eventType}]`, {
+    event_type: eventType,
+    ip_address: ip,
+    participant_id: participantId,
+    ...details,
+  });
+
+  // Persiste no banco de dados (async, sem bloquear)
+  import('../database/db').then(({ insert }) => {
+    import('../utils/helpers').then(({ generateUUID }) => {
+      try {
+        insert('security_events', {
+          id: generateUUID(),
+          event_type: eventType,
+          participant_id: participantId,
+          ip_address: ip,
+          details: detailsStr,
+          created_at: new Date().toISOString(),
+        });
+      } catch (e) {
+        // Não falha se não conseguir persistir
+      }
+    });
+  }).catch(() => {
+    // DB pode não estar inicializado ainda
+  });
+}
