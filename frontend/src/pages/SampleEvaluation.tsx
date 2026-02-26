@@ -510,6 +510,9 @@ export default function SampleEvaluation() {
                 <ul className="list-disc pl-5 space-y-1">
                   <li>{t('eval.help_zoom_1')}</li>
                   <li>{t('eval.help_zoom_2')}</li>
+                  <li>{t('eval.help_zoom_3')}</li>
+                  <li>{t('eval.help_zoom_4')}</li>
+                  <li>{t('eval.help_zoom_5')}</li>
                 </ul>
               </section>
 

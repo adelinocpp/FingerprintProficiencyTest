@@ -12,6 +12,7 @@ interface MinutiaeCanvasProps {
   imageIndex: number | null;
   visible?: boolean;
   onMarkingsChange?: (markings: Marking[]) => void;
+  zoom?: number;
 }
 
 const CIRCLE_RADIUS = 12;
@@ -24,6 +25,7 @@ export default function MinutiaeCanvas({
   imageIndex,
   visible = true,
   onMarkingsChange,
+  zoom = 1,
 }: MinutiaeCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -86,19 +88,22 @@ export default function MinutiaeCanvas({
 
     if (!visible) return;
 
+    const scaledRadius = CIRCLE_RADIUS * zoom;
+    const scaledLineWidth = 2 * zoom;
+
     for (const m of markingsRef.current) {
       const px = m.x * canvas.width;
       const py = m.y * canvas.height;
 
       ctx.beginPath();
-      ctx.arc(px, py, CIRCLE_RADIUS, 0, Math.PI * 2);
+      ctx.arc(px, py, scaledRadius, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255, 50, 50, 0.25)';
       ctx.fill();
       ctx.strokeStyle = 'rgba(255, 50, 50, 0.85)';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = scaledLineWidth;
       ctx.stroke();
     }
-  }, [visible]);
+  }, [visible, zoom]);
 
   useEffect(() => {
     drawMarkings();
@@ -162,7 +167,7 @@ export default function MinutiaeCanvas({
       const dx = (m.x - nx) * rect.width;
       const dy = (m.y - ny) * rect.height;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < REMOVE_TOLERANCE && dist < closestDist) {
+      if (dist < REMOVE_TOLERANCE * zoom && dist < closestDist) {
         closestDist = dist;
         closestId = m.id;
       }

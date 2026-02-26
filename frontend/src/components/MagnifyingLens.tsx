@@ -11,6 +11,7 @@ interface MagnifyingLensProps {
   zoomLevel?: number;
   markings?: LensMarking[];
   showMarkings?: boolean;
+  panelZoom?: number;
   children: React.ReactNode;
 }
 
@@ -20,6 +21,7 @@ export default function MagnifyingLens({
   zoomLevel = 2.5,
   markings = [],
   showMarkings = true,
+  panelZoom = 1,
   children,
 }: MagnifyingLensProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -99,7 +101,7 @@ export default function MagnifyingLens({
       if (!isInBounds(e)) return;
       e.preventDefault();
 
-      const delta = e.deltaY > 0 ? -0.3 : 0.3;
+      const delta = e.deltaY > 0 ? 0.3 : -0.3;
       setCurrentZoom(prev => Math.max(1.5, Math.min(8, prev + delta)));
     };
 
@@ -129,7 +131,7 @@ export default function MagnifyingLens({
   const bgY = -(position.y * currentZoom - radius);
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative w-full h-full">
       {children}
 
       {isActive && (
@@ -151,7 +153,7 @@ export default function MagnifyingLens({
             className="absolute bottom-1 right-2 text-[10px] font-mono text-white/80 bg-black/40 px-1 rounded"
             style={{ pointerEvents: 'none' }}
           >
-            {currentZoom.toFixed(1)}x
+            {(currentZoom * panelZoom).toFixed(1)}x
           </span>
 
           {/* Marcações de minúcias no zoom */}

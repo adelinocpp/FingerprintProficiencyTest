@@ -1,10 +1,14 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { X } from "lucide-react";
+import { X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import MagnifyingLens from "@/components/MagnifyingLens";
 import MinutiaeCanvas, { type Marking } from "@/components/MinutiaeCanvas";
+
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 5;
+const ZOOM_STEP = 0.25;
 
 interface GroupViewerProps {
   group: {
@@ -30,6 +34,43 @@ export interface GroupResult {
   notes: string | null;
 }
 
+function ZoomControls({ zoom, onZoomIn, onZoomOut, onReset }: {
+  zoom: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-0.5">
+      <button
+        onClick={onZoomOut}
+        disabled={zoom <= ZOOM_MIN}
+        className="p-0.5 rounded hover:bg-black/10 disabled:opacity-30 transition-colors"
+        title="Zoom out"
+      >
+        <ZoomOut className="w-3.5 h-3.5" />
+      </button>
+      <span className="text-[10px] font-mono w-8 text-center select-none">{Math.round(zoom * 100)}%</span>
+      <button
+        onClick={onZoomIn}
+        disabled={zoom >= ZOOM_MAX}
+        className="p-0.5 rounded hover:bg-black/10 disabled:opacity-30 transition-colors"
+        title="Zoom in"
+      >
+        <ZoomIn className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={onReset}
+        disabled={zoom === 1}
+        className="p-0.5 rounded hover:bg-black/10 disabled:opacity-30 transition-colors"
+        title="Reset zoom"
+      >
+        <RotateCcw className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
 export default function GroupViewer({ group, carryCode, evaluation, onEvaluationChange }: GroupViewerProps) {
   const API_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
 
@@ -46,8 +87,73 @@ export default function GroupViewer({ group, carryCode, evaluation, onEvaluation
   const [questionadaMarkings, setQuestionadaMarkings] = useState<Marking[]>([]);
   const [padraoMarkings, setPadraoMarkings] = useState<Marking[]>([]);
 
+  // Zoom state
+  const [questionadaZoom, setQuestionadaZoom] = useState(1);
+  const [padraoZoom, setPadraoZoom] = useState(1);
+
+  // Refs for scroll containers (native wheel events)
+  const questionadaScrollRef = useRef<HTMLDivElement>(null);
+  const padraoScrollRef = useRef<HTMLDivElement>(null);
+
   const handleQuestionadaMarkings = useCallback((m: Marking[]) => setQuestionadaMarkings(m), []);
   const handlePadraoMarkings = useCallback((m: Marking[]) => setPadraoMarkings(m), []);
+
+  // Wheel zoom handlers (native events with passive: false)
+  useEffect(() => {
+    const qEl = questionadaScrollRef.current;
+    const pEl = padraoScrollRef.current;
+
+    const makeHandler = (
+      setZoom: React.Dispatch<React.SetStateAction<number>>,
+      scrollEl: HTMLDivElement
+    ) => (e: WheelEvent) => {
+      // Skip when right mouse button is held (MagnifyingLens handles it)
+      if (e.buttons & 2) return;
+
+      e.preventDefault();
+
+      // Cursor position relative to scroll viewport
+      const rect = scrollEl.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Content coordinate under cursor
+      const contentX = scrollEl.scrollLeft + mouseX;
+      const contentY = scrollEl.scrollTop + mouseY;
+
+      const delta = e.deltaY > 0 ? ZOOM_STEP : -ZOOM_STEP;
+      setZoom(prev => {
+        const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((prev + delta) * 100) / 100));
+        if (newZoom === prev) return prev;
+
+        const scale = newZoom / prev;
+        // Adjust scroll after DOM update to keep cursor point stable
+        requestAnimationFrame(() => {
+          scrollEl.scrollLeft = contentX * scale - mouseX;
+          scrollEl.scrollTop = contentY * scale - mouseY;
+        });
+
+        return newZoom;
+      });
+    };
+
+    const qHandler = qEl ? makeHandler(setQuestionadaZoom, qEl) : null;
+    const pHandler = pEl ? makeHandler(setPadraoZoom, pEl) : null;
+
+    if (qEl && qHandler) qEl.addEventListener('wheel', qHandler, { passive: false });
+    if (pEl && pHandler) pEl.addEventListener('wheel', pHandler, { passive: false });
+
+    return () => {
+      if (qEl && qHandler) qEl.removeEventListener('wheel', qHandler);
+      if (pEl && pHandler) pEl.removeEventListener('wheel', pHandler);
+    };
+  }, []);
+
+  // Reset zoom when group changes
+  useEffect(() => {
+    setQuestionadaZoom(1);
+    setPadraoZoom(1);
+  }, [group.group_id]);
 
   const updateEvaluation = (updates: any) => {
     onEvaluationChange({ ...evaluation, ...updates });
@@ -102,36 +208,57 @@ export default function GroupViewer({ group, carryCode, evaluation, onEvaluation
         <div className="flex-1 flex flex-col border-2 border-blue-500 rounded-lg overflow-hidden min-w-0">
           <div className="bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700 border-b shrink-0 flex items-center justify-between">
             <span>Impressão Questionada</span>
-            <label className="flex items-center gap-1 cursor-pointer text-xs font-normal">
-              <input
-                type="checkbox"
-                checked={showMinutiae}
-                onChange={(e) => setShowMinutiae(e.target.checked)}
-                className="w-3 h-3"
+            <div className="flex items-center gap-2">
+              <ZoomControls
+                zoom={questionadaZoom}
+                onZoomIn={() => setQuestionadaZoom(z => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 100) / 100))}
+                onZoomOut={() => setQuestionadaZoom(z => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 100) / 100))}
+                onReset={() => setQuestionadaZoom(1)}
               />
-              Minúcias
-            </label>
+              <label className="flex items-center gap-1 cursor-pointer text-xs font-normal">
+                <input
+                  type="checkbox"
+                  checked={showMinutiae}
+                  onChange={(e) => setShowMinutiae(e.target.checked)}
+                  className="w-3 h-3"
+                />
+                Minúcias
+              </label>
+            </div>
           </div>
-          <div className="flex-1 relative flex items-center justify-center p-2 overflow-hidden">
-            <MagnifyingLens
-              imageSrc={questionadaUrl}
-              markings={questionadaMarkings}
-              showMarkings={showMinutiae}
+          <div
+            ref={questionadaScrollRef}
+            className="flex-1 relative overflow-auto"
+          >
+            <div
+              className="relative"
+              style={{
+                width: `${questionadaZoom * 100}%`,
+                height: `${questionadaZoom * 100}%`,
+              }}
             >
-              <img
-                src={questionadaUrl}
-                alt="Impressão Questionada"
-                className="max-w-full max-h-full object-contain"
-                loading="lazy"
+              <MagnifyingLens
+                imageSrc={questionadaUrl}
+                markings={questionadaMarkings}
+                showMarkings={showMinutiae}
+                panelZoom={questionadaZoom}
+              >
+                <img
+                  src={questionadaUrl}
+                  alt="Impressão Questionada"
+                  className="w-full h-full object-contain"
+                  loading="lazy"
+                />
+              </MagnifyingLens>
+              <MinutiaeCanvas
+                groupId={group.group_id}
+                imageType="questionada"
+                imageIndex={null}
+                visible={showMinutiae}
+                onMarkingsChange={handleQuestionadaMarkings}
+                zoom={questionadaZoom}
               />
-            </MagnifyingLens>
-            <MinutiaeCanvas
-              groupId={group.group_id}
-              imageType="questionada"
-              imageIndex={null}
-              visible={showMinutiae}
-              onMarkingsChange={handleQuestionadaMarkings}
-            />
+            </div>
           </div>
         </div>
 
@@ -144,29 +271,47 @@ export default function GroupViewer({ group, carryCode, evaluation, onEvaluation
           }`}>
             <span>{selectedForComparison !== null ? `Padrão #${selectedForComparison}` : 'Selecione um padrão'}</span>
             {selectedForComparison !== null && (
-              <label className="flex items-center gap-1 cursor-pointer text-xs font-normal">
-                <input
-                  type="checkbox"
-                  checked={showMinutiae}
-                  onChange={(e) => setShowMinutiae(e.target.checked)}
-                  className="w-3 h-3"
+              <div className="flex items-center gap-2">
+                <ZoomControls
+                  zoom={padraoZoom}
+                  onZoomIn={() => setPadraoZoom(z => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 100) / 100))}
+                  onZoomOut={() => setPadraoZoom(z => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 100) / 100))}
+                  onReset={() => setPadraoZoom(1)}
                 />
-                Minúcias
-              </label>
+                <label className="flex items-center gap-1 cursor-pointer text-xs font-normal">
+                  <input
+                    type="checkbox"
+                    checked={showMinutiae}
+                    onChange={(e) => setShowMinutiae(e.target.checked)}
+                    className="w-3 h-3"
+                  />
+                  Minúcias
+                </label>
+              </div>
             )}
           </div>
-          <div className="flex-1 relative flex items-center justify-center p-2 overflow-hidden">
+          <div
+            ref={padraoScrollRef}
+            className="flex-1 relative overflow-auto"
+          >
             {selectedForComparison !== null ? (
-              <>
+              <div
+                className="relative"
+                style={{
+                  width: `${padraoZoom * 100}%`,
+                  height: `${padraoZoom * 100}%`,
+                }}
+              >
                 <MagnifyingLens
                   imageSrc={getStandardUrl(selectedForComparison)}
                   markings={padraoMarkings}
                   showMarkings={showMinutiae}
+                  panelZoom={padraoZoom}
                 >
                   <img
                     src={getStandardUrl(selectedForComparison)}
                     alt={`Padrão ${selectedForComparison}`}
-                    className="max-w-full max-h-full object-contain"
+                    className="w-full h-full object-contain"
                     loading="lazy"
                   />
                 </MagnifyingLens>
@@ -176,12 +321,15 @@ export default function GroupViewer({ group, carryCode, evaluation, onEvaluation
                   imageIndex={selectedForComparison}
                   visible={showMinutiae}
                   onMarkingsChange={handlePadraoMarkings}
+                  zoom={padraoZoom}
                 />
-              </>
+              </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center px-4">
-                Clique em uma miniatura ao lado para comparar
-              </p>
+              <div className="flex-1 flex items-center justify-center h-full">
+                <p className="text-sm text-muted-foreground text-center px-4">
+                  Clique em uma miniatura ao lado para comparar
+                </p>
+              </div>
             )}
           </div>
         </div>
